@@ -70,8 +70,16 @@ export async function POST(
       }
 
       try {
-        const existing = (await getCaseMessages(id)) as DeliberationMessage[];
-        const messages = existing.map((m) => ({ ...m })) as DeliberationMessage[];
+        const existing = await getCaseMessages(id);
+        const messages: DeliberationMessage[] = existing.map((m) => ({
+          id: m.id,
+          speakerType: m.speakerType as DeliberationMessage["speakerType"],
+          speakerId: m.speakerId,
+          speakerName: m.speakerName,
+          content: m.content,
+          order: m.order,
+          createdAt: m.createdAt.toISOString(),
+        }));
         let order =
           messages.length > 0 ? Math.max(...messages.map((m) => m.order)) + 1 : 0;
 

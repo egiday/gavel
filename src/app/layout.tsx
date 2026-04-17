@@ -97,7 +97,7 @@ export default function RootLayout({
       className={`${inter.variable} ${serif.variable} ${mono.variable} h-full antialiased`}
     >
       <body className="min-h-full bg-background text-foreground font-sans flex flex-col [overscroll-behavior-y:contain]">
-        <TooltipProvider delayDuration={150}>{children}</TooltipProvider>
+        <TooltipProvider>{children}</TooltipProvider>
         <Toaster richColors closeButton position="top-center" />
       </body>
     </html>
