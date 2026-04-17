@@ -24,6 +24,19 @@ interface Props {
   initialMessages: DeliberationMessage[];
   initialVerdict: VerdictRecord | null;
   onVerdict: (v: VerdictRecord) => void;
+  /** when true, the view is read-only — no start button, no streaming,
+   * messages come from props and refresh as the parent re-fetches. */
+  spectator?: boolean;
+}
+
+function toLiveMsgs(messages: DeliberationMessage[]): LiveMsg[] {
+  return messages.map((m) => ({
+    id: `persisted-${m.id}`,
+    speakerType: m.speakerType,
+    speakerId: m.speakerId,
+    speakerName: m.speakerName,
+    content: m.content,
+  }));
 }
 
 type LiveMsg = {
@@ -40,22 +53,31 @@ export function DeliberationView({
   initialMessages,
   initialVerdict,
   onVerdict,
+  spectator = false,
 }: Props) {
   const apiKey = useSettings((s) => s.apiKey);
   const [keyModal, setKeyModal] = useState(false);
-  const [messages, setMessages] = useState<LiveMsg[]>(
-    initialMessages.map((m) => ({
-      id: `persisted-${m.id}`,
-      speakerType: m.speakerType,
-      speakerId: m.speakerId,
-      speakerName: m.speakerName,
-      content: m.content,
-    })),
+  const [messages, setMessages] = useState<LiveMsg[]>(() =>
+    toLiveMsgs(initialMessages),
   );
   const [votes, setVotes] = useState<VoteRecord[]>(initialVerdict?.votes ?? []);
   const [running, setRunning] = useState(false);
   const [done, setDone] = useState(!!initialVerdict);
   const [autoScrollOn, setAutoScrollOn] = useState(true);
+
+  // in spectator mode, re-sync local state from polled props
+  useEffect(() => {
+    if (!spectator) return;
+    setMessages(toLiveMsgs(initialMessages));
+  }, [spectator, initialMessages]);
+
+  useEffect(() => {
+    if (!spectator) return;
+    if (initialVerdict) {
+      setVotes(initialVerdict.votes);
+      setDone(true);
+    }
+  }, [spectator, initialVerdict]);
 
   const scrollRef = useRef<HTMLDivElement | null>(null);
   const streamAbort = useRef<AbortController | null>(null);
@@ -141,16 +163,22 @@ export function DeliberationView({
     [k: string]: unknown;
   }) {
     if (ev.type === "start") {
-      const s = ev.speaker as LiveMsg;
+      // server sends speaker: { type, id, name } — map to our LiveMsg shape
+      const s = ev.speaker as {
+        type: LiveMsg["speakerType"];
+        id: string;
+        name: string;
+      };
+      const name = s?.name ?? "";
       setMessages((prev) => [
         ...prev,
         {
           id: ev.messageId as string,
-          speakerType: s.speakerType,
-          speakerId: s.speakerId,
-          speakerName: s.speakerName,
+          speakerType: s?.type ?? "juror",
+          speakerId: s?.id ?? "unknown",
+          speakerName: name,
           content: "",
-          isVerdictVote: /— verdict/i.test(s.speakerName),
+          isVerdictVote: /—\s*verdict/i.test(name),
         },
       ]);
     } else if (ev.type === "delta") {
@@ -204,7 +232,11 @@ export function DeliberationView({
               ? "verdict rendered"
               : running
                 ? "jury deliberating live"
-                : "session paused"}
+                : spectator
+                  ? messages.length > 0
+                    ? "watching live"
+                    : "awaiting opening"
+                  : "session paused"}
           </span>
         </div>
         <Badge variant="outline" className="rounded-full text-[10px] uppercase tracking-widest">
@@ -223,7 +255,9 @@ export function DeliberationView({
             <div>
               <p className="text-lg font-semibold">The jury is seated.</p>
               <p className="text-sm text-muted-foreground">
-                Hit the button below to call the session to order.
+                {spectator
+                  ? "Waiting for the plaintiff to call court to order."
+                  : "Hit the button below to call the session to order."}
               </p>
             </div>
           </div>
@@ -268,7 +302,7 @@ export function DeliberationView({
 
       {/* controls */}
       <div className="sticky bottom-0 z-10 mt-4 border-t bg-background/95 px-1 pt-3 backdrop-blur-xl mb-safe">
-        {canStart && (
+        {!spectator && canStart && (
           <Button
             size="lg"
             className="h-12 w-full rounded-full text-base font-semibold"
@@ -277,6 +311,11 @@ export function DeliberationView({
             <PlayCircle className="size-5" />
             {apiKey ? "Call court to order" : "Begin (needs Anthropic key)"}
           </Button>
+        )}
+        {spectator && !done && (
+          <div className="flex items-center justify-center gap-2 text-sm text-muted-foreground">
+            <Loader2 className="size-4 animate-spin" /> Watching the courtroom — auto-refreshing.
+          </div>
         )}
         {running && (
           <div className="flex items-center justify-center gap-2 text-sm text-muted-foreground">
@@ -309,7 +348,7 @@ export function DeliberationView({
             </ul>
           </Card>
         )}
-        {!apiKey && (
+        {!apiKey && !spectator && (
           <Button
             variant="ghost"
             size="sm"
@@ -321,7 +360,13 @@ export function DeliberationView({
         )}
       </div>
 
-      <ApiKeyModal open={keyModal} onOpenChange={setKeyModal} onSaved={() => void startDeliberation()} />
+      {!spectator && (
+        <ApiKeyModal
+          open={keyModal}
+          onOpenChange={setKeyModal}
+          onSaved={() => void startDeliberation()}
+        />
+      )}
     </div>
   );
 }
@@ -373,9 +418,10 @@ function renderAvatar(m: LiveMsg) {
       );
     }
   }
+  const initial = (m.speakerName ?? "").trim()[0] ?? "?";
   return (
     <Avatar className="size-9 border">
-      <AvatarFallback>{m.speakerName[0] ?? "?"}</AvatarFallback>
+      <AvatarFallback>{initial}</AvatarFallback>
     </Avatar>
   );
 }

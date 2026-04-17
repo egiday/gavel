@@ -27,25 +27,39 @@ interface Props {
 export function CaseWorkspace(props: Props) {
   const [caseData, setCaseData] = useState(props.caseData);
   const [verdict, setVerdict] = useState(props.verdict);
+  const [messages, setMessages] = useState<DeliberationMessage[]>(
+    props.messages,
+  );
   const youRole = props.youRole;
+  const isSpectator = youRole === null;
   const outerThemeClass = caseData.mode === "petty" ? "mode-petty dark" : "mode-real";
 
   useEffect(() => {
-    // poll while we're waiting on something to change server-side:
-    // - defendant to file
-    // - other party's lawyer pick
-    // - verdict rendered by the other device
+    // poll for updates — status changes, lawyer picks, streamed messages,
+    // and the final verdict. spectators lean on this to follow the case.
     const hasVerdict = caseData.status === "verdict" && !!verdict;
     if (hasVerdict) return;
+    const interval = isSpectator ? 3000 : 5000;
     const t = setInterval(async () => {
       const res = await fetch(`/api/cases/${caseData.id}`);
       if (!res.ok) return;
       const data = await res.json();
       setCaseData(data);
+      if (Array.isArray(data.messages)) {
+        setMessages(
+          data.messages.map((m: DeliberationMessage & { createdAt: string | Date }) => ({
+            ...m,
+            createdAt:
+              typeof m.createdAt === "string"
+                ? m.createdAt
+                : new Date(m.createdAt).toISOString(),
+          })),
+        );
+      }
       if (data.verdict) setVerdict(data.verdict);
-    }, 5000);
+    }, interval);
     return () => clearInterval(t);
-  }, [caseData.id, caseData.status, verdict]);
+  }, [caseData.id, caseData.status, verdict, isSpectator]);
 
   function handleLawyerPicked(updated: CasePayload) {
     setCaseData(updated);
@@ -110,6 +124,27 @@ export function CaseWorkspace(props: Props) {
         {/* the main stage */}
         {verdict && caseData.status === "verdict" ? (
           <VerdictCard caseData={caseData} verdict={verdict} />
+        ) : isSpectator && awaitingDefendant ? (
+          <Card className="p-6 text-center">
+            <FileText className="mx-auto size-10 text-muted-foreground" />
+            <h2 className="mt-3 font-heading text-2xl font-bold">
+              Case filed — defendant hasn&rsquo;t responded yet
+            </h2>
+            <p className="mt-2 text-sm text-muted-foreground">
+              This page will update automatically as the parties file.
+            </p>
+            <p className="mt-4 text-xs font-mono text-muted-foreground">
+              code · {caseData.shareCode}
+            </p>
+          </Card>
+        ) : isSpectator ? (
+          <DeliberationView
+            caseData={caseData}
+            initialMessages={messages}
+            initialVerdict={verdict}
+            onVerdict={handleVerdict}
+            spectator
+          />
         ) : awaitingDefendant && youRole !== "defendant" ? (
           <InvitePanel caseData={caseData} />
         ) : awaitingDefendant && youRole === "defendant" ? (
@@ -144,7 +179,7 @@ export function CaseWorkspace(props: Props) {
         ) : (
           <DeliberationView
             caseData={caseData}
-            initialMessages={props.messages}
+            initialMessages={messages}
             initialVerdict={verdict}
             onVerdict={handleVerdict}
           />
