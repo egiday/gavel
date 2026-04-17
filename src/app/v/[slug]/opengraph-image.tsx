@@ -8,9 +8,10 @@ export const contentType = "image/png";
 export default async function OGImage({
   params,
 }: {
-  params: { slug: string };
+  params: Promise<{ slug: string }>;
 }) {
-  const c = await getCaseBySlug(params.slug);
+  const { slug } = await params;
+  const c = await getCaseBySlug(slug);
   if (!c) {
     return new ImageResponse(
       (
@@ -54,6 +55,8 @@ export default async function OGImage({
     (acc, vt) => ({ ...acc, [vt.ruling]: acc[vt.ruling] + 1 }),
     { plaintiff: 0, defendant: 0 },
   );
+  const modeLabel = `${c.mode} court`;
+  const tallyLabel = `${tally.plaintiff}-${tally.defendant}`;
 
   return new ImageResponse(
     (
@@ -69,8 +72,24 @@ export default async function OGImage({
           fontFamily: "sans-serif",
         }}
       >
-        <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between" }}>
-          <div style={{ display: "flex", alignItems: "center", gap: 12, fontSize: 26, fontWeight: 700 }}>
+        {/* header row */}
+        <div
+          style={{
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "space-between",
+            width: "100%",
+          }}
+        >
+          <div
+            style={{
+              display: "flex",
+              alignItems: "center",
+              gap: 12,
+              fontSize: 26,
+              fontWeight: 700,
+            }}
+          >
             <div
               style={{
                 width: 44,
@@ -87,10 +106,11 @@ export default async function OGImage({
             >
               G
             </div>
-            Gavel
+            <div style={{ display: "flex" }}>Gavel</div>
           </div>
           <div
             style={{
+              display: "flex",
               padding: "8px 16px",
               borderRadius: 999,
               border: `1px solid ${border}`,
@@ -101,10 +121,11 @@ export default async function OGImage({
               fontWeight: 700,
             }}
           >
-            {c.mode} court
+            {modeLabel}
           </div>
         </div>
 
+        {/* main block */}
         <div
           style={{
             display: "flex",
@@ -113,11 +134,20 @@ export default async function OGImage({
             marginTop: 60,
           }}
         >
-          <div style={{ fontSize: 22, letterSpacing: 4, color: subtle, fontWeight: 700 }}>
+          <div
+            style={{
+              display: "flex",
+              fontSize: 22,
+              letterSpacing: 4,
+              color: subtle,
+              fontWeight: 700,
+            }}
+          >
             THE COURT RULES
           </div>
           <div
             style={{
+              display: "flex",
               fontSize: 92,
               fontWeight: 900,
               letterSpacing: -1.5,
@@ -129,6 +159,7 @@ export default async function OGImage({
           </div>
           <div
             style={{
+              display: "flex",
               fontSize: 40,
               fontWeight: 700,
               marginTop: 20,
@@ -140,6 +171,7 @@ export default async function OGImage({
           </div>
         </div>
 
+        {/* footer row */}
         <div
           style={{
             marginTop: "auto",
@@ -149,11 +181,19 @@ export default async function OGImage({
             fontSize: 22,
             color: subtle,
             fontWeight: 600,
+            width: "100%",
           }}
         >
-          <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
+          <div
+            style={{
+              display: "flex",
+              alignItems: "center",
+              gap: 12,
+            }}
+          >
             <div
               style={{
+                display: "flex",
                 padding: "6px 14px",
                 borderRadius: 999,
                 border: `1px solid ${border}`,
@@ -161,11 +201,11 @@ export default async function OGImage({
                 fontWeight: 800,
               }}
             >
-              {tally.plaintiff}-{tally.defendant}
+              {tallyLabel}
             </div>
-            vote tally
+            <div style={{ display: "flex" }}>vote tally</div>
           </div>
-          <div style={{ color: subtle }}>gavel.app</div>
+          <div style={{ display: "flex", color: subtle }}>gavel.app</div>
         </div>
       </div>
     ),
