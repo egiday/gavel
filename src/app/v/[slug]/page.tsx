@@ -64,6 +64,7 @@ export default async function VerdictPage({
   const rows = await getCaseMessages(caseData.id);
   const messages: DeliberationMessage[] = rows.map((r) => ({
     id: r.id,
+    phase: (r.phase as DeliberationMessage["phase"]) ?? "trial",
     speakerType: r.speakerType as DeliberationMessage["speakerType"],
     speakerId: r.speakerId,
     speakerName: r.speakerName,

@@ -1,8 +1,15 @@
 "use client";
 
-import { useCallback, useEffect, useRef, useState } from "react";
+import { Fragment, useCallback, useEffect, useRef, useState } from "react";
 import { AnimatePresence, motion } from "framer-motion";
-import { Gavel, Loader2, PlayCircle, KeyRound } from "lucide-react";
+import {
+  Gavel,
+  Loader2,
+  PlayCircle,
+  KeyRound,
+  Scale,
+  Users,
+} from "lucide-react";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -15,6 +22,7 @@ import { ApiKeyModal } from "@/components/api-key-modal";
 import type {
   CasePayload,
   DeliberationMessage,
+  TrialPhase,
   VerdictRecord,
   VoteRecord,
 } from "@/lib/types";
@@ -24,14 +32,23 @@ interface Props {
   initialMessages: DeliberationMessage[];
   initialVerdict: VerdictRecord | null;
   onVerdict: (v: VerdictRecord) => void;
-  /** when true, the view is read-only — no start button, no streaming,
-   * messages come from props and refresh as the parent re-fetches. */
   spectator?: boolean;
 }
+
+type LiveMsg = {
+  id: string;
+  phase: TrialPhase;
+  speakerType: DeliberationMessage["speakerType"];
+  speakerId: string;
+  speakerName: string;
+  content: string;
+  isVerdictVote?: boolean;
+};
 
 function toLiveMsgs(messages: DeliberationMessage[]): LiveMsg[] {
   return messages.map((m) => ({
     id: `persisted-${m.id}`,
+    phase: m.phase,
     speakerType: m.speakerType,
     speakerId: m.speakerId,
     speakerName: m.speakerName,
@@ -39,13 +56,10 @@ function toLiveMsgs(messages: DeliberationMessage[]): LiveMsg[] {
   }));
 }
 
-type LiveMsg = {
-  id: string; // temp id from server
-  speakerType: DeliberationMessage["speakerType"];
-  speakerId: string;
-  speakerName: string;
-  content: string;
-  isVerdictVote?: boolean;
+const PHASE_LABELS: Record<TrialPhase, string> = {
+  trial: "Trial",
+  deliberation: "Jury Deliberation",
+  verdict: "Verdict",
 };
 
 export function DeliberationView({
@@ -63,21 +77,14 @@ export function DeliberationView({
   const [votes, setVotes] = useState<VoteRecord[]>(initialVerdict?.votes ?? []);
   const [running, setRunning] = useState(false);
   const [done, setDone] = useState(!!initialVerdict);
+  const [phase, setPhase] = useState<TrialPhase>(
+    initialVerdict
+      ? "verdict"
+      : initialMessages.some((m) => m.phase === "deliberation")
+        ? "deliberation"
+        : "trial",
+  );
   const [autoScrollOn, setAutoScrollOn] = useState(true);
-
-  // in spectator mode, re-sync local state from polled props
-  useEffect(() => {
-    if (!spectator) return;
-    setMessages(toLiveMsgs(initialMessages));
-  }, [spectator, initialMessages]);
-
-  useEffect(() => {
-    if (!spectator) return;
-    if (initialVerdict) {
-      setVotes(initialVerdict.votes);
-      setDone(true);
-    }
-  }, [spectator, initialVerdict]);
 
   const scrollRef = useRef<HTMLDivElement | null>(null);
   const streamAbort = useRef<AbortController | null>(null);
@@ -88,6 +95,22 @@ export function DeliberationView({
   }, []);
 
   useEffect(() => {
+    if (!spectator) return;
+    setMessages(toLiveMsgs(initialMessages));
+    const hasDelib = initialMessages.some((m) => m.phase === "deliberation");
+    setPhase(hasDelib ? "deliberation" : "trial");
+  }, [spectator, initialMessages]);
+
+  useEffect(() => {
+    if (!spectator) return;
+    if (initialVerdict) {
+      setVotes(initialVerdict.votes);
+      setDone(true);
+      setPhase("verdict");
+    }
+  }, [spectator, initialVerdict]);
+
+  useEffect(() => {
     if (!autoScrollOn) return;
     const el = scrollRef.current;
     if (el) el.scrollTop = el.scrollHeight;
@@ -96,8 +119,7 @@ export function DeliberationView({
   const handleScroll = useCallback(() => {
     const el = scrollRef.current;
     if (!el) return;
-    const nearBottom =
-      el.scrollHeight - el.scrollTop - el.clientHeight < 80;
+    const nearBottom = el.scrollHeight - el.scrollTop - el.clientHeight < 80;
     setAutoScrollOn(nearBottom);
   }, []);
 
@@ -143,14 +165,12 @@ export function DeliberationView({
             const ev = JSON.parse(data);
             handleEvent(ev);
           } catch {
-            /* ignore malformed line */
+            /* ignore */
           }
         }
       }
     } catch (err) {
-      if ((err as { name?: string }).name === "AbortError") {
-        /* noop */
-      } else {
+      if ((err as { name?: string }).name !== "AbortError") {
         console.error("deliberation stream error", err);
       }
     } finally {
@@ -158,22 +178,22 @@ export function DeliberationView({
     }
   }, [apiKey, caseData.id, running]);
 
-  function handleEvent(ev: {
-    type: string;
-    [k: string]: unknown;
-  }) {
-    if (ev.type === "start") {
-      // server sends speaker: { type, id, name } — map to our LiveMsg shape
+  function handleEvent(ev: { type: string; [k: string]: unknown }) {
+    if (ev.type === "phase") {
+      setPhase(ev.phase as TrialPhase);
+    } else if (ev.type === "start") {
       const s = ev.speaker as {
         type: LiveMsg["speakerType"];
         id: string;
         name: string;
       };
       const name = s?.name ?? "";
+      const evPhase = (ev.phase as TrialPhase) ?? phase;
       setMessages((prev) => [
         ...prev,
         {
           id: ev.messageId as string,
+          phase: evPhase,
           speakerType: s?.type ?? "juror",
           speakerId: s?.id ?? "unknown",
           speakerName: name,
@@ -185,9 +205,7 @@ export function DeliberationView({
       const mid = ev.messageId as string;
       const text = ev.text as string;
       setMessages((prev) =>
-        prev.map((m) =>
-          m.id === mid ? { ...m, content: m.content + text } : m,
-        ),
+        prev.map((m) => (m.id === mid ? { ...m, content: m.content + text } : m)),
       );
     } else if (ev.type === "end") {
       const mid = ev.messageId as string;
@@ -202,6 +220,7 @@ export function DeliberationView({
     } else if (ev.type === "verdict") {
       const { ruling, summary, topQuote } = ev as unknown as VerdictRecord;
       onVerdict({ ruling, summary, topQuote, votes });
+      setPhase("verdict");
       gavel();
     } else if (ev.type === "done") {
       setDone(true);
@@ -210,38 +229,16 @@ export function DeliberationView({
     }
   }
 
-  const canStart =
-    !running && !done && messages.length === initialMessages.length;
+  const canStart = !running && !done && messages.length === initialMessages.length;
+
+  // group messages by phase for rendering
+  const groupedMessages = groupByPhase(messages);
 
   return (
     <div className="flex flex-1 flex-col">
-      <div className="flex items-center justify-between gap-3 pb-3">
-        <div className="flex items-center gap-2 text-xs text-muted-foreground">
-          <span className="relative inline-flex size-2">
-            {running && (
-              <span className="absolute inline-flex size-full animate-ping rounded-full bg-primary opacity-75" />
-            )}
-            <span
-              className={`relative inline-flex size-2 rounded-full ${
-                running ? "bg-primary" : done ? "bg-green-500" : "bg-muted-foreground/40"
-              }`}
-            />
-          </span>
-          <span>
-            {done
-              ? "verdict rendered"
-              : running
-                ? "jury deliberating live"
-                : spectator
-                  ? messages.length > 0
-                    ? "watching live"
-                    : "awaiting opening"
-                  : "session paused"}
-          </span>
-        </div>
-        <Badge variant="outline" className="rounded-full text-[10px] uppercase tracking-widest">
-          {caseData.mode}
-        </Badge>
+      {/* phase tracker */}
+      <div className="pb-3">
+        <PhaseTracker phase={phase} done={done} />
       </div>
 
       <div
@@ -263,41 +260,52 @@ export function DeliberationView({
           </div>
         )}
 
-        <ul className="space-y-4">
-          <AnimatePresence initial={false}>
-            {messages.map((m) => (
-              <motion.li
-                key={m.id}
-                layout
-                initial={{ opacity: 0, y: 12 }}
-                animate={{ opacity: 1, y: 0 }}
-                transition={{ duration: 0.25 }}
-                className="flex items-start gap-3"
-              >
-                {renderAvatar(m)}
-                <div className="min-w-0 flex-1">
-                  <div className="mb-0.5 flex items-baseline justify-between gap-2">
-                    <span className="truncate text-xs font-semibold">
-                      {m.speakerName}
-                    </span>
-                    <span className="shrink-0 text-[10px] uppercase tracking-widest text-muted-foreground">
-                      {labelForSpeaker(m.speakerType)}
-                    </span>
-                  </div>
-                  <p
-                    className={`whitespace-pre-wrap break-words text-sm leading-snug ${
-                      m.isVerdictVote ? "font-heading text-base" : ""
-                    }`}
-                  >
-                    {m.content || (
-                      <span className="text-muted-foreground/60">…</span>
-                    )}
-                  </p>
-                </div>
-              </motion.li>
-            ))}
-          </AnimatePresence>
-        </ul>
+        <div className="space-y-6">
+          {groupedMessages.map((group) => (
+            <Fragment key={group.phase}>
+              <PhaseBanner phase={group.phase} />
+              <ul className="space-y-4">
+                <AnimatePresence initial={false}>
+                  {group.items.map((m) => (
+                    <motion.li
+                      key={m.id}
+                      layout
+                      initial={{ opacity: 0, y: 12 }}
+                      animate={{ opacity: 1, y: 0 }}
+                      transition={{ duration: 0.25 }}
+                      className={`flex items-start gap-3 ${
+                        m.phase === "trial" && isPartyOrCounsel(m.speakerType)
+                          ? "rounded-2xl border bg-muted/40 p-3"
+                          : ""
+                      }`}
+                    >
+                      {renderAvatar(m)}
+                      <div className="min-w-0 flex-1">
+                        <div className="mb-0.5 flex items-baseline justify-between gap-2">
+                          <span className="truncate text-xs font-semibold">
+                            {m.speakerName}
+                          </span>
+                          <span className="shrink-0 text-[10px] uppercase tracking-widest text-muted-foreground">
+                            {labelForSpeaker(m.speakerType, m.phase)}
+                          </span>
+                        </div>
+                        <p
+                          className={`whitespace-pre-wrap break-words text-sm leading-snug ${
+                            m.isVerdictVote ? "font-heading text-base" : ""
+                          }`}
+                        >
+                          {m.content || (
+                            <span className="text-muted-foreground/60">…</span>
+                          )}
+                        </p>
+                      </div>
+                    </motion.li>
+                  ))}
+                </AnimatePresence>
+              </ul>
+            </Fragment>
+          ))}
+        </div>
       </div>
 
       {/* controls */}
@@ -371,12 +379,16 @@ export function DeliberationView({
   );
 }
 
-function labelForSpeaker(t: DeliberationMessage["speakerType"]): string {
+function labelForSpeaker(
+  t: DeliberationMessage["speakerType"],
+  phase: TrialPhase,
+): string {
+  if (phase === "verdict") return "verdict";
   switch (t) {
     case "judge":
       return "judge";
     case "juror":
-      return "juror";
+      return phase === "trial" ? "jury" : "juror";
     case "lawyer":
       return "counsel";
     case "plaintiff":
@@ -384,6 +396,10 @@ function labelForSpeaker(t: DeliberationMessage["speakerType"]): string {
     case "defendant":
       return "defendant";
   }
+}
+
+function isPartyOrCounsel(t: DeliberationMessage["speakerType"]): boolean {
+  return t === "lawyer" || t === "plaintiff" || t === "defendant";
 }
 
 function renderAvatar(m: LiveMsg) {
@@ -432,4 +448,82 @@ async function safeJson(res: Response) {
   } catch {
     return null;
   }
+}
+
+function groupByPhase(messages: LiveMsg[]): Array<{ phase: TrialPhase; items: LiveMsg[] }> {
+  const groups: Array<{ phase: TrialPhase; items: LiveMsg[] }> = [];
+  for (const m of messages) {
+    const last = groups[groups.length - 1];
+    if (!last || last.phase !== m.phase) {
+      groups.push({ phase: m.phase, items: [m] });
+    } else {
+      last.items.push(m);
+    }
+  }
+  return groups;
+}
+
+function PhaseBanner({ phase }: { phase: TrialPhase }) {
+  const icon =
+    phase === "trial" ? (
+      <Scale className="size-3.5" />
+    ) : phase === "deliberation" ? (
+      <Users className="size-3.5" />
+    ) : (
+      <Gavel className="size-3.5" />
+    );
+  const subtitle =
+    phase === "trial"
+      ? "Parties and counsel argue. The jury watches silently."
+      : phase === "deliberation"
+        ? "The jury is alone in the room. Lawyers dismissed."
+        : "The verdict is rendered.";
+  return (
+    <div className="sticky top-0 z-[5] -mx-4 sm:-mx-5 bg-card/95 px-4 pt-2 pb-3 backdrop-blur sm:px-5">
+      <div className="flex items-center gap-2 text-xs font-semibold uppercase tracking-widest text-muted-foreground">
+        {icon}
+        <span className="text-foreground">{PHASE_LABELS[phase]}</span>
+      </div>
+      <p className="mt-1 text-xs text-muted-foreground">{subtitle}</p>
+    </div>
+  );
+}
+
+function PhaseTracker({ phase, done }: { phase: TrialPhase; done: boolean }) {
+  const stages: TrialPhase[] = ["trial", "deliberation", "verdict"];
+  const activeIdx =
+    phase === "verdict" || done ? 2 : phase === "deliberation" ? 1 : 0;
+  return (
+    <div className="flex items-center gap-2">
+      {stages.map((s, i) => (
+        <Fragment key={s}>
+          <div className="flex items-center gap-1.5">
+            <span
+              className={`size-2 rounded-full transition-colors ${
+                i < activeIdx
+                  ? "bg-primary"
+                  : i === activeIdx
+                    ? "animate-pulse bg-primary"
+                    : "bg-muted-foreground/30"
+              }`}
+            />
+            <span
+              className={`text-[10px] font-semibold uppercase tracking-widest ${
+                i <= activeIdx ? "text-foreground" : "text-muted-foreground/50"
+              }`}
+            >
+              {PHASE_LABELS[s]}
+            </span>
+          </div>
+          {i < stages.length - 1 && (
+            <span
+              className={`h-px flex-1 ${
+                i < activeIdx ? "bg-primary" : "bg-border"
+              }`}
+            />
+          )}
+        </Fragment>
+      ))}
+    </div>
+  );
 }

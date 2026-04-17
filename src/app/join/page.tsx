@@ -3,16 +3,20 @@
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
-import { ChevronLeft, ScanLine } from "lucide-react";
+import { ChevronLeft, ScanLine, Shield, Eye } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Card } from "@/components/ui/card";
 import { Label } from "@/components/ui/label";
+import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { toast } from "sonner";
+
+type Intent = "defend" | "spectate";
 
 export default function JoinPage() {
   const [code, setCode] = useState("");
   const [loading, setLoading] = useState(false);
+  const [intent, setIntent] = useState<Intent>("defend");
   const router = useRouter();
 
   async function handleJoin() {
@@ -28,7 +32,11 @@ export default function JoinPage() {
         toast.error("No case matching that code");
         return;
       }
-      router.push(`/join/${c}`);
+      if (intent === "spectate") {
+        router.push(`/case/${c}`);
+      } else {
+        router.push(`/join/${c}`);
+      }
     } finally {
       setLoading(false);
     }
@@ -56,11 +64,33 @@ export default function JoinPage() {
             </div>
             <h2 className="mt-4 font-heading text-2xl font-bold">Enter the case code</h2>
             <p className="mt-1 text-sm text-muted-foreground">
-              Six characters. They should&rsquo;ve texted it to you.
+              Six characters. Defend, or watch from the gallery.
             </p>
           </div>
 
-          <div className="mt-6 space-y-3">
+          <div className="mt-6 space-y-4">
+            <Tabs value={intent} onValueChange={(v) => setIntent(v as Intent)}>
+              <TabsList className="grid h-11 w-full grid-cols-2 rounded-full">
+                <TabsTrigger
+                  value="defend"
+                  className="rounded-full text-sm font-semibold data-[state=active]:shadow"
+                >
+                  <Shield className="size-4" /> Defend
+                </TabsTrigger>
+                <TabsTrigger
+                  value="spectate"
+                  className="rounded-full text-sm font-semibold data-[state=active]:shadow"
+                >
+                  <Eye className="size-4" /> Spectate
+                </TabsTrigger>
+              </TabsList>
+            </Tabs>
+            <p className="text-center text-xs text-muted-foreground">
+              {intent === "defend"
+                ? "File your response and argue in court."
+                : "Watch the trial unfold. Chat with other spectators live."}
+            </p>
+
             <Label htmlFor="code" className="sr-only">Case code</Label>
             <Input
               id="code"
@@ -78,7 +108,11 @@ export default function JoinPage() {
               onClick={handleJoin}
               disabled={loading || code.length !== 6}
             >
-              {loading ? "Checking…" : "Continue"}
+              {loading
+                ? "Checking…"
+                : intent === "defend"
+                  ? "Continue to defend"
+                  : "Continue to watch"}
             </Button>
           </div>
         </Card>

@@ -10,6 +10,7 @@ import { InvitePanel } from "@/components/case/invite-panel";
 import { LawyerPicker } from "@/components/case/lawyer-picker";
 import { DeliberationView } from "@/components/case/deliberation-view";
 import { VerdictCard } from "@/components/case/verdict-card";
+import { ChatPanel } from "@/components/case/chat-panel";
 import { JURORS, avatarUrl } from "@/lib/jurors";
 import type {
   CasePayload,
@@ -205,6 +206,13 @@ export function CaseWorkspace(props: Props) {
                     : "Defendant has not yet filed a response.")}
               </p>
             </Card>
+          </div>
+        )}
+
+        {/* peanut gallery chat — available from in_session onward */}
+        {caseData.status !== "awaiting_defendant" && (
+          <div className="mt-6">
+            <ChatPanel caseId={caseData.id} defaultOpen={isSpectator} />
           </div>
         )}
       </main>

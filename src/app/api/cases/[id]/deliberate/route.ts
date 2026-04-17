@@ -1,20 +1,22 @@
 import { getCaseById, getCaseMessages, jurorsForCase } from "@/lib/cases";
 import { prisma } from "@/lib/db";
-import { JURORS, getJuror, type Juror } from "@/lib/jurors";
-import { getLawyer } from "@/lib/lawyers";
+import { JURORS, type Juror } from "@/lib/jurors";
+import { getLawyer, type Lawyer } from "@/lib/lawyers";
 import { streamText } from "@/lib/anthropic";
 import {
-  absenteeDefenderPrompt,
+  absenteeOpeningPrompt,
   judgeOpeningPrompt,
+  judgeTransitionPrompt,
   jurorDeliberationPrompt,
   jurorVotePrompt,
-  lawyerOpeningPrompt,
+  openingStatementPrompt,
+  trialArgumentPrompt,
   verdictSynthesisPrompt,
 } from "@/lib/prompts";
 import type {
-  CasePayload,
   DeliberationMessage,
   SpeakerType,
+  TrialPhase,
 } from "@/lib/types";
 
 export const runtime = "nodejs";
@@ -22,7 +24,17 @@ export const dynamic = "force-dynamic";
 export const maxDuration = 300;
 
 type Event =
-  | { type: "start"; speaker: { type: SpeakerType; id: string; name: string }; messageId: string }
+  | {
+      type: "phase";
+      phase: TrialPhase;
+      label: string;
+    }
+  | {
+      type: "start";
+      speaker: { type: SpeakerType; id: string; name: string };
+      phase: TrialPhase;
+      messageId: string;
+    }
   | { type: "delta"; messageId: string; text: string }
   | { type: "end"; messageId: string; content: string }
   | {
@@ -70,15 +82,16 @@ export async function POST(
       }
 
       try {
-        const existing = await getCaseMessages(id);
-        const messages: DeliberationMessage[] = existing.map((m) => ({
-          id: m.id,
-          speakerType: m.speakerType as DeliberationMessage["speakerType"],
-          speakerId: m.speakerId,
-          speakerName: m.speakerName,
-          content: m.content,
-          order: m.order,
-          createdAt: m.createdAt.toISOString(),
+        const existingRows = await getCaseMessages(id);
+        const messages: DeliberationMessage[] = existingRows.map((r) => ({
+          id: r.id,
+          phase: (r.phase as TrialPhase) ?? "trial",
+          speakerType: r.speakerType as SpeakerType,
+          speakerId: r.speakerId,
+          speakerName: r.speakerName,
+          content: r.content,
+          order: r.order,
+          createdAt: r.createdAt.toISOString(),
         }));
         let order =
           messages.length > 0 ? Math.max(...messages.map((m) => m.order)) + 1 : 0;
@@ -87,30 +100,42 @@ export async function POST(
         const jury = picked.length > 0 ? picked : JURORS.slice(0, 5);
 
         async function runStep({
+          phase,
           speakerType,
           speakerId,
           speakerName,
           system,
           user,
+          maxTokens = 300,
         }: {
+          phase: TrialPhase;
           speakerType: SpeakerType;
           speakerId: string;
           speakerName: string;
           system: string;
           user: string;
+          maxTokens?: number;
         }): Promise<string> {
           const tempId = `tmp-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
           send({
             type: "start",
             speaker: { type: speakerType, id: speakerId, name: speakerName },
+            phase,
             messageId: tempId,
           });
-          const content = await streamText(apiKey!, system, user, {
-            onDelta: (t) => send({ type: "delta", messageId: tempId, text: t }),
-          });
+          const content = await streamText(
+            apiKey!,
+            system,
+            user,
+            {
+              onDelta: (t) => send({ type: "delta", messageId: tempId, text: t }),
+            },
+            maxTokens,
+          );
           const saved = await prisma.message.create({
             data: {
               caseId: id,
+              phase,
               speakerType,
               speakerId,
               speakerName,
@@ -120,6 +145,7 @@ export async function POST(
           });
           messages.push({
             id: saved.id,
+            phase,
             speakerType,
             speakerId,
             speakerName,
@@ -131,94 +157,256 @@ export async function POST(
           return saved.content;
         }
 
-        // 1) judge opening
-        if (messages.length === 0) {
-          await runStep({
-            speakerType: "judge",
-            speakerId: "judge-marlowe",
-            speakerName: "Judge Marlowe",
-            system: judgeOpeningPrompt(caseData),
-            user: "Open the court session now.",
-          });
-        }
+        // phase helpers
+        const hasTrial = messages.some((m) => m.phase === "trial");
+        const hasDeliberation = messages.some((m) => m.phase === "deliberation");
 
-        // 2) lawyer openings (if any). skip if already done
-        const alreadyHasLawyerOpening = (lid: string) =>
-          messages.some(
-            (m) => m.speakerType === "lawyer" && m.speakerId === lid,
-          );
+        // ============== TRIAL PHASE ==============
+        if (!hasDeliberation) {
+          send({ type: "phase", phase: "trial", label: "Trial" });
 
-        if (caseData.plaintiffLawyer) {
-          const lawyer = getLawyer(caseData.plaintiffLawyer);
-          if (lawyer && !alreadyHasLawyerOpening(`${lawyer.id}:plaintiff`)) {
+          // 1) judge opens court
+          if (!messages.some((m) => m.speakerType === "judge" && m.phase === "trial")) {
             await runStep({
-              speakerType: "lawyer",
-              speakerId: `${lawyer.id}:plaintiff`,
-              speakerName: `${lawyer.name} (plaintiff)`,
-              system: lawyerOpeningPrompt(caseData, lawyer, "plaintiff"),
-              user: "Deliver your opening statement.",
+              phase: "trial",
+              speakerType: "judge",
+              speakerId: "judge-marlowe",
+              speakerName: "Judge Marlowe",
+              system: judgeOpeningPrompt(caseData),
+              user: "Call court to order and frame the matter.",
+              maxTokens: 220,
             });
           }
-        }
 
-        if (caseData.absentDefendant && caseData.isSolo) {
-          // devil's advocate statement
-          if (
-            !messages.some(
+          // helper to build a "speaker" for either counsel or self-rep
+          function speakerFor(side: "plaintiff" | "defendant"): {
+            speakerType: SpeakerType;
+            speakerId: string;
+            speakerName: string;
+            speakerBrief: {
+              kind: "lawyer" | "self";
+              lawyer?: Lawyer;
+              partyName: string;
+              partyStory: string;
+            };
+          } | null {
+            const story =
+              side === "plaintiff" ? caseData!.plaintiffSide : caseData!.defendantSide ?? "";
+            const partyName =
+              side === "plaintiff"
+                ? caseData!.plaintiffName || "Plaintiff"
+                : caseData!.defendantName || "Defendant";
+            const lawyerId =
+              side === "plaintiff"
+                ? caseData!.plaintiffLawyer
+                : caseData!.defendantLawyer;
+
+            if (side === "defendant" && caseData!.absentDefendant) return null;
+
+            if (lawyerId && lawyerId !== "self") {
+              const lawyer = getLawyer(lawyerId);
+              if (!lawyer) return null;
+              return {
+                speakerType: "lawyer",
+                speakerId: `${lawyer.id}:${side}`,
+                speakerName: `${lawyer.name} · for ${side === "plaintiff" ? "the plaintiff" : "the defense"}`,
+                speakerBrief: {
+                  kind: "lawyer",
+                  lawyer,
+                  partyName,
+                  partyStory: story,
+                },
+              };
+            }
+            // self-defense
+            return {
+              speakerType: side,
+              speakerId: `${side}:self`,
+              speakerName: partyName,
+              speakerBrief: {
+                kind: "self",
+                partyName,
+                partyStory: story,
+              },
+            };
+          }
+
+          const plaintiffSpeaker = speakerFor("plaintiff")!;
+          const defendantSpeaker = speakerFor("defendant");
+
+          function alreadyDeliveredOpening(speakerId: string): boolean {
+            return messages.some(
               (m) =>
-                m.speakerType === "lawyer" &&
-                m.speakerId === "devils-advocate",
-            )
-          ) {
+                m.phase === "trial" &&
+                m.speakerId === speakerId &&
+                m.speakerType !== "judge",
+            );
+          }
+
+          // 2) plaintiff opening
+          if (!alreadyDeliveredOpening(plaintiffSpeaker.speakerId)) {
             await runStep({
-              speakerType: "lawyer",
-              speakerId: "devils-advocate",
-              speakerName: "Devil's Advocate",
-              system: absenteeDefenderPrompt(caseData),
-              user: "Deliver a brief steelman of the absent defendant's position.",
+              phase: "trial",
+              speakerType: plaintiffSpeaker.speakerType,
+              speakerId: plaintiffSpeaker.speakerId,
+              speakerName: plaintiffSpeaker.speakerName,
+              system: openingStatementPrompt(caseData, "plaintiff", plaintiffSpeaker.speakerBrief),
+              user: "Deliver your opening statement.",
+              maxTokens: 260,
             });
           }
-        } else if (caseData.defendantLawyer) {
-          const lawyer = getLawyer(caseData.defendantLawyer);
-          if (lawyer && !alreadyHasLawyerOpening(`${lawyer.id}:defendant`)) {
+
+          // 3) defendant opening (or devil's advocate)
+          if (defendantSpeaker) {
+            if (!alreadyDeliveredOpening(defendantSpeaker.speakerId)) {
+              await runStep({
+                phase: "trial",
+                speakerType: defendantSpeaker.speakerType,
+                speakerId: defendantSpeaker.speakerId,
+                speakerName: defendantSpeaker.speakerName,
+                system: openingStatementPrompt(caseData, "defendant", defendantSpeaker.speakerBrief),
+                user: "Deliver your opening statement.",
+                maxTokens: 260,
+              });
+            }
+          } else if (caseData.absentDefendant) {
+            const daId = "devils-advocate:defendant";
+            if (!alreadyDeliveredOpening(daId)) {
+              await runStep({
+                phase: "trial",
+                speakerType: "lawyer",
+                speakerId: daId,
+                speakerName: "Devil's Advocate · for the defense",
+                system: absenteeOpeningPrompt(caseData),
+                user: "Steelman the absent defendant's position.",
+                maxTokens: 220,
+              });
+            }
+          }
+
+          // 4) argument rounds — two exchanges of rebut + press, then closings
+          // rounds: [defendant rebut, plaintiff press, defendant press, plaintiff rebut]
+          type Round = {
+            side: "plaintiff" | "defendant";
+            role: "rebut" | "press";
+          };
+          const rounds: Round[] = [
+            { side: "defendant", role: "rebut" },
+            { side: "plaintiff", role: "press" },
+            { side: "defendant", role: "press" },
+            { side: "plaintiff", role: "rebut" },
+          ];
+
+          for (const r of rounds) {
+            const sp = speakerFor(r.side);
+            if (!sp) continue; // absent defendant already got a devil's advocate opening
+            const marker = `${sp.speakerId}::${r.role}`;
+            const already = messages.some(
+              (m) =>
+                m.phase === "trial" &&
+                m.speakerId === sp.speakerId &&
+                m.content.includes(""),
+            );
+            // use a stronger duplicate guard: count trial messages per speaker
+            const countForSpeaker = messages.filter(
+              (m) => m.phase === "trial" && m.speakerId === sp.speakerId,
+            ).length;
+            const desiredCount =
+              rounds
+                .slice(0, rounds.indexOf(r) + 1)
+                .filter((rr) => speakerFor(rr.side)?.speakerId === sp.speakerId)
+                .length + 1; // +1 for the opening
+            if (countForSpeaker >= desiredCount) continue;
+            void already; // silence lint on unused
+            void marker;
+
             await runStep({
-              speakerType: "lawyer",
-              speakerId: `${lawyer.id}:defendant`,
-              speakerName: `${lawyer.name} (defendant)`,
-              system: lawyerOpeningPrompt(caseData, lawyer, "defendant"),
-              user: "Deliver your opening statement.",
+              phase: "trial",
+              speakerType: sp.speakerType,
+              speakerId: sp.speakerId,
+              speakerName: sp.speakerName,
+              system: trialArgumentPrompt(
+                caseData,
+                r.side,
+                sp.speakerBrief,
+                messages,
+                r.role,
+              ),
+              user: r.role === "rebut" ? "Rebut what opposing counsel just said." : "Press your case.",
+              maxTokens: 240,
+            });
+          }
+
+          // 5) closings (one per side)
+          for (const side of ["plaintiff", "defendant"] as const) {
+            const sp = speakerFor(side);
+            if (!sp) continue;
+            const countForSpeaker = messages.filter(
+              (m) => m.phase === "trial" && m.speakerId === sp.speakerId,
+            ).length;
+            const expectedMax = side === "plaintiff" ? 4 : 4; // opening + 2 rounds + closing
+            if (countForSpeaker >= expectedMax) continue;
+            await runStep({
+              phase: "trial",
+              speakerType: sp.speakerType,
+              speakerId: sp.speakerId,
+              speakerName: `${sp.speakerName} · closing`,
+              system: trialArgumentPrompt(
+                caseData,
+                side,
+                sp.speakerBrief,
+                messages,
+                "close",
+              ),
+              user: "Deliver your closing statement.",
+              maxTokens: 260,
+            });
+          }
+
+          // 6) judge transitions to deliberation
+          const transitionDone = messages.some(
+            (m) => m.phase === "trial" && m.speakerId === "judge-marlowe:transition",
+          );
+          if (!transitionDone) {
+            await runStep({
+              phase: "trial",
+              speakerType: "judge",
+              speakerId: "judge-marlowe:transition",
+              speakerName: "Judge Marlowe",
+              system: judgeTransitionPrompt(caseData),
+              user: "Close the trial and send the jury to deliberate.",
+              maxTokens: 160,
             });
           }
         }
 
-        // 3) jury deliberation — 8 to 12 turns, weighted to hit each juror at least once
-        const TARGET_TURNS = Math.min(
-          12,
-          Math.max(8, jury.length * 2),
-        );
-        const turnOrder = buildTurnOrder(jury, TARGET_TURNS);
+        // ============== DELIBERATION PHASE ==============
+        send({ type: "phase", phase: "deliberation", label: "Deliberation" });
 
-        const deliberationAlready = messages.filter(
-          (m) => m.speakerType === "juror",
+        const TARGET_TURNS = Math.min(12, Math.max(8, jury.length * 2));
+        const turnOrder = buildTurnOrder(jury, TARGET_TURNS);
+        const jurorMsgCount = messages.filter(
+          (m) => m.phase === "deliberation" && m.speakerType === "juror",
         ).length;
 
-        for (let i = deliberationAlready; i < turnOrder.length; i += 1) {
+        for (let i = jurorMsgCount; i < turnOrder.length; i += 1) {
           const juror = turnOrder[i];
           await runStep({
+            phase: "deliberation",
             speakerType: "juror",
             speakerId: juror.id,
             speakerName: juror.name,
             system: jurorDeliberationPrompt(caseData, juror, messages),
-            user: "Your turn to weigh in.",
+            user: "Your turn in the jury room.",
+            maxTokens: 180,
           });
         }
 
-        // 4) votes — one per jury member
-        const votesPrior = await prisma.vote.findMany({
+        // ============== VOTES ==============
+        const existingVotes = await prisma.vote.findMany({
           where: { verdict: { caseId: id } },
         });
-        const haveVoteFor = (jurorId: string) =>
-          votesPrior.some((v) => v.jurorId === jurorId);
+        const have = (jurorId: string) => existingVotes.some((v) => v.jurorId === jurorId);
 
         const verdictVotes: Array<{
           jurorId: string;
@@ -228,16 +416,21 @@ export async function POST(
         }> = [];
 
         for (const juror of jury) {
-          if (haveVoteFor(juror.id)) continue;
+          if (have(juror.id)) continue;
           const tempId = `vote-${juror.id}`;
           send({
             type: "start",
             speaker: { type: "juror", id: juror.id, name: `${juror.name} — verdict` },
+            phase: "verdict",
             messageId: tempId,
           });
-          const content = await streamText(apiKey!, jurorVotePrompt(caseData, juror, messages), "Cast your vote.", {
-            onDelta: (t) => send({ type: "delta", messageId: tempId, text: t }),
-          });
+          const content = await streamText(
+            apiKey!,
+            jurorVotePrompt(caseData, juror, messages),
+            "Cast your vote.",
+            { onDelta: (t) => send({ type: "delta", messageId: tempId, text: t }) },
+            120,
+          );
           send({ type: "end", messageId: tempId, content });
           const { ruling, reasoning } = parseVote(content);
           verdictVotes.push({
@@ -249,12 +442,13 @@ export async function POST(
           send({ type: "vote", jurorId: juror.id, jurorName: juror.name, ruling, reasoning });
         }
 
-        // 5) synthesis
-        const synthesis = await streamTextIntoBuffer(
+        // ============== SYNTHESIS ==============
+        const synthesis = await streamText(
           apiKey!,
           verdictSynthesisPrompt(caseData, messages, verdictVotes),
-          "Deliver the court's synthesized verdict.",
-          (t) => send({ type: "delta", messageId: "verdict-synth", text: t }),
+          "Deliver the synthesized verdict.",
+          { onDelta: (t) => send({ type: "delta", messageId: "verdict-synth", text: t }) },
+          260,
         );
 
         const tally = verdictVotes.reduce(
@@ -269,7 +463,6 @@ export async function POST(
               : "split";
         const topQuote = findTopQuote(messages);
 
-        // persist verdict + votes
         const verdictRow = await prisma.verdict.upsert({
           where: { caseId: id },
           create: {
@@ -291,13 +484,12 @@ export async function POST(
             },
           });
         }
-        await prisma.case.update({
-          where: { id },
-          data: { status: "verdict" },
-        });
+        await prisma.case.update({ where: { id }, data: { status: "verdict" } });
 
         send({ type: "verdict", ruling, summary: synthesis.trim(), topQuote });
         send({ type: "done" });
+
+        void hasTrial; // silence unused
       } catch (err: unknown) {
         const message = err instanceof Error ? err.message : "unexpected error";
         send({ type: "error", message });
@@ -315,15 +507,6 @@ export async function POST(
       "x-accel-buffering": "no",
     },
   });
-}
-
-async function streamTextIntoBuffer(
-  apiKey: string,
-  system: string,
-  user: string,
-  onDelta: (t: string) => void,
-): Promise<string> {
-  return streamText(apiKey, system, user, { onDelta });
 }
 
 function buildTurnOrder(jury: Juror[], totalTurns: number): Juror[] {
@@ -350,19 +533,19 @@ function parseVote(content: string): {
   reasoning: string;
 } {
   const upper = content.toUpperCase();
-  const plaintiff = upper.indexOf("FOR THE PLAINTIFF");
-  const defendant = upper.indexOf("FOR THE DEFENDANT");
+  const p = upper.indexOf("FOR THE PLAINTIFF");
+  const d = upper.indexOf("FOR THE DEFENDANT");
   const ruling =
-    (plaintiff >= 0 && (defendant < 0 || plaintiff < defendant)) ? "plaintiff" : "defendant";
+    (p >= 0 && (d < 0 || p < d)) ? "plaintiff" : "defendant";
   const lines = content.split("\n").map((l) => l.trim()).filter(Boolean);
-  // first line is the ruling, remaining lines are reasoning
   const reasoning = lines.slice(1).join(" ").trim() || lines[0] || "";
   return { ruling, reasoning };
 }
 
 function findTopQuote(messages: DeliberationMessage[]): string | null {
-  // pick the juror message with the best quote feel — longest within a range.
-  const jurorMsgs = messages.filter((m) => m.speakerType === "juror");
+  const jurorMsgs = messages.filter(
+    (m) => m.phase === "deliberation" && m.speakerType === "juror",
+  );
   if (jurorMsgs.length === 0) return null;
   const ranked = jurorMsgs
     .map((m) => ({ m, score: scoreQuote(m.content) }))
@@ -380,6 +563,3 @@ function scoreQuote(text: string): number {
   if (/[!?]/.test(text)) bonus += 2;
   return len + bonus;
 }
-
-// silence unused local warnings in some build configurations
-void (null as unknown as CasePayload);

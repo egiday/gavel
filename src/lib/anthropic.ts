@@ -13,13 +13,14 @@ export async function streamText(
   systemPrompt: string,
   userPrompt: string,
   callbacks?: StreamCallbacks,
+  maxTokens = 400,
 ): Promise<string> {
   const client = new Anthropic({ apiKey });
 
   let full = "";
   const stream = await client.messages.stream({
     model: MODEL,
-    max_tokens: 400,
+    max_tokens: maxTokens,
     system: systemPrompt,
     messages: [{ role: "user", content: userPrompt }],
   });

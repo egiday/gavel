@@ -14,13 +14,23 @@ export type SpeakerType =
   | "plaintiff"
   | "defendant";
 
+export type TrialPhase = "trial" | "deliberation" | "verdict";
+
 export interface DeliberationMessage {
   id: string;
+  phase: TrialPhase;
   speakerType: SpeakerType;
   speakerId: string;
   speakerName: string;
   content: string;
   order: number;
+  createdAt: string;
+}
+
+export interface ChatLine {
+  id: string;
+  displayName: string;
+  content: string;
   createdAt: string;
 }
 

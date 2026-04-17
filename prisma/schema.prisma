@@ -29,6 +29,7 @@ model Case {
   createdAt         DateTime  @default(now())
   updatedAt         DateTime  @updatedAt
   messages          Message[]
+  chat              ChatMessage[]
   verdict           Verdict?
 
   @@index([shareCode])
@@ -39,14 +40,26 @@ model Message {
   id          String   @id @default(cuid())
   caseId      String
   case        Case     @relation(fields: [caseId], references: [id], onDelete: Cascade)
+  phase       String   @default("trial") // "trial" | "deliberation" | "verdict"
   speakerType String   // "judge" | "juror" | "lawyer" | "plaintiff" | "defendant"
-  speakerId   String   // persona id for ai, party id for parties
+  speakerId   String
   speakerName String
   content     String
   order       Int
   createdAt   DateTime @default(now())
 
   @@index([caseId, order])
+}
+
+model ChatMessage {
+  id          String   @id @default(cuid())
+  caseId      String
+  case        Case     @relation(fields: [caseId], references: [id], onDelete: Cascade)
+  displayName String
+  content     String
+  createdAt   DateTime @default(now())
+
+  @@index([caseId, createdAt])
 }
 
 model Verdict {

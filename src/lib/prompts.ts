@@ -1,4 +1,5 @@
-// system prompt builders for the judge, jurors, lawyers, and verdict synthesis
+// prompts for the two phases: TRIAL (parties + counsel argue, jury watches silently)
+// and DELIBERATION (jury alone, no parties, no counsel)
 
 import type { Juror } from "./jurors";
 import type { Lawyer } from "./lawyers";
@@ -6,75 +7,158 @@ import type { CasePayload, DeliberationMessage, Mode } from "./types";
 
 const MODE_TONES: Record<Mode, string> = {
   petty:
-    "This is PETTY court. Lean into personality. Roast, joke, drop slang. Don't be afraid to be dramatic. Petty doesn't mean cruel — it means loud, opinionated, alive.",
+    "This is PETTY court. Loud, dramatic, slightly ridiculous. Petty does not mean cruel — it means alive. Roasts, bars, hot takes. Jokes land. Emotions are real.",
   real:
-    "This is REAL court. Handle the dispute with weight. Be measured, thoughtful, fair. Ask clarifying questions in character. Don't downplay, but don't dramatize either.",
+    "This is REAL court. Measured, careful, firm. Treat the dispute with weight. Ask clarifying questions in character. Don't minimize, don't sensationalize.",
 };
 
-function caseContext(c: CasePayload): string {
+function caseHeader(c: CasePayload): string {
   const plaintiffName = c.plaintiffName || "Plaintiff";
-  const defendantName = c.defendantName || (c.absentDefendant ? "Defendant (absent)" : "Defendant");
+  const defendantName =
+    c.defendantName ||
+    (c.absentDefendant ? "Defendant (absent, represented by devil's advocate)" : "Defendant");
   return [
     `CASE TITLE: ${c.title}`,
     `MODE: ${c.mode}`,
-    `PLAINTIFF (${plaintiffName}) SAID:\n"""${c.plaintiffSide}"""`,
+    `PLAINTIFF (${plaintiffName}) FILED:\n"""${c.plaintiffSide}"""`,
     c.defendantSide
-      ? `DEFENDANT (${defendantName}) SAID:\n"""${c.defendantSide}"""`
+      ? `DEFENDANT (${defendantName}) RESPONDED:\n"""${c.defendantSide}"""`
       : c.absentDefendant
-        ? `DEFENDANT IS ABSENT — an AI devil's advocate will cover their position.`
-        : `DEFENDANT has not yet filed a response.`,
+        ? `DEFENDANT IS ABSENT. A devil's advocate stands in to steelman the strongest version of their position.`
+        : `DEFENDANT has not yet filed.`,
   ].join("\n\n");
 }
 
-function recentExchange(messages: DeliberationMessage[], take = 6): string {
-  const last = messages.slice(-take);
-  if (last.length === 0) return "(no prior discussion — you're first)";
-  return last
-    .map((m) => `[${m.speakerName}] ${m.content}`)
-    .join("\n");
+function recentTrial(messages: DeliberationMessage[], take = 8): string {
+  const trial = messages.filter((m) => m.phase === "trial");
+  const slice = trial.slice(-take);
+  if (slice.length === 0) return "(none yet — you're opening the matter)";
+  return slice.map((m) => `[${m.speakerName}] ${m.content}`).join("\n");
 }
+
+function recentDeliberation(messages: DeliberationMessage[], take = 6): string {
+  const delib = messages.filter((m) => m.phase === "deliberation");
+  const slice = delib.slice(-take);
+  if (slice.length === 0) return "(you're the first to speak in the jury room)";
+  return slice.map((m) => `[${m.speakerName}] ${m.content}`).join("\n");
+}
+
+function trialTranscript(messages: DeliberationMessage[]): string {
+  const trial = messages.filter((m) => m.phase === "trial");
+  if (trial.length === 0) return "(no trial transcript recorded)";
+  return trial.map((m) => `[${m.speakerName}] ${m.content}`).join("\n");
+}
+
+// ---- TRIAL PHASE ----------------------------------------------------------
 
 export function judgeOpeningPrompt(c: CasePayload): string {
   return [
     MODE_TONES[c.mode],
-    "You are JUDGE MARLOWE, presiding. Retired federal judge. Formal, dry. You open court and frame the matter at hand.",
-    caseContext(c),
-    `TASK: Open court. Call the session to order. Restate the dispute in one or two sentences. Direct the lawyers (if any) to deliver opening statements, or the jury to begin deliberation. Keep it under 60 words.`,
-    "Respond as the judge speaking in court, in character. No stage directions. No quote marks around your line.",
+    "You are JUDGE MARLOWE, presiding. Retired federal judge. Formal, dry, measured. You call court to order and frame the dispute. You will then invite opening statements.",
+    caseHeader(c),
+    `TASK: Open court. State that the matter is ${JSON.stringify(c.title)}. Frame what's at stake in one or two sentences. Invite the plaintiff to open. The jury is present but will remain silent throughout trial. Keep it under 55 words. No stage directions.`,
   ].join("\n\n");
 }
 
-export function lawyerOpeningPrompt(
+export function openingStatementPrompt(
   c: CasePayload,
-  lawyer: Lawyer,
   side: "plaintiff" | "defendant",
+  speaker: {
+    kind: "lawyer" | "self";
+    lawyer?: Lawyer;
+    partyName: string;
+    partyStory: string;
+  },
 ): string {
-  const sideStory =
-    side === "plaintiff"
-      ? c.plaintiffSide
-      : c.defendantSide ?? "Client's position has not been formally submitted.";
-  const sideName =
-    side === "plaintiff"
-      ? c.plaintiffName || "the plaintiff"
-      : c.defendantName || "the defendant";
+  const role = side === "plaintiff" ? "plaintiff" : "defendant";
+  const voice =
+    speaker.kind === "lawyer" && speaker.lawyer
+      ? [
+          `You are ${speaker.lawyer.name}, counsel for the ${role} (${speaker.partyName}).`,
+          `PERSONA: ${speaker.lawyer.persona}`,
+          `VOICE STYLE: ${speaker.lawyer.voiceStyle}`,
+        ].join("\n")
+      : [
+          `You are ${speaker.partyName}, the ${role}, representing yourself.`,
+          `You sound like a real person — not a lawyer. Plain speech, specific details, zero legalese.`,
+        ].join("\n");
   return [
     MODE_TONES[c.mode],
-    `You are ${lawyer.name}, opposing counsel for ${sideName}.`,
-    `PERSONA: ${lawyer.persona}`,
-    `VOICE STYLE: ${lawyer.voiceStyle}`,
-    caseContext(c),
-    `YOUR CLIENT'S POSITION:\n"""${sideStory}"""`,
-    `TASK: Deliver a punchy opening statement for your client. Don't enumerate — persuade. Land 2–4 sentences max. Stay in character.`,
+    voice,
+    caseHeader(c),
+    `YOUR SIDE'S POSITION (use as grounding, don't quote verbatim):\n"""${speaker.partyStory}"""`,
+    [
+      "TASK: Deliver an opening statement for your side.",
+      "2–4 sentences. Persuade, don't recite. No bullet points. No stage directions.",
+      "End with one sharp line that sets the frame.",
+    ].join(" "),
   ].join("\n\n");
 }
 
-export function absenteeDefenderPrompt(c: CasePayload): string {
+export function absenteeOpeningPrompt(c: CasePayload): string {
   return [
     MODE_TONES[c.mode],
-    "You are a DEVIL'S ADVOCATE briefly standing in for the absent defendant. Steelman the most reasonable version of their position without pretending to be them. Acknowledge uncertainty. 2–3 sentences.",
-    caseContext(c),
+    "You are a DEVIL'S ADVOCATE standing in for the absent defendant. Steelman the most reasonable version of their position — acknowledging you're speculating. 2–3 sentences.",
+    caseHeader(c),
   ].join("\n\n");
 }
+
+export function trialArgumentPrompt(
+  c: CasePayload,
+  side: "plaintiff" | "defendant",
+  speaker: {
+    kind: "lawyer" | "self";
+    lawyer?: Lawyer;
+    partyName: string;
+    partyStory: string;
+  },
+  messages: DeliberationMessage[],
+  role: "rebut" | "press" | "close",
+): string {
+  const sideLabel = side === "plaintiff" ? "plaintiff" : "defendant";
+  const voice =
+    speaker.kind === "lawyer" && speaker.lawyer
+      ? [
+          `You are ${speaker.lawyer.name}, counsel for the ${sideLabel} (${speaker.partyName}).`,
+          `PERSONA: ${speaker.lawyer.persona}`,
+          `VOICE STYLE: ${speaker.lawyer.voiceStyle}`,
+        ].join("\n")
+      : [
+          `You are ${speaker.partyName}, the ${sideLabel}, representing yourself in court.`,
+          "Speak plainly. You're a real person, not a lawyer. Specific details over rhetoric.",
+        ].join("\n");
+
+  const direction: Record<typeof role, string> = {
+    rebut:
+      "TASK: Respond to what opposing counsel just said. Pick the weakest point they made and hit it hard — one or two sentences. Then plant your own strongest counter in one sentence.",
+    press:
+      "TASK: Press your case. Introduce a fact or angle the other side hasn't addressed. Keep it to 2–3 sentences. Stay in character.",
+    close:
+      "TASK: Deliver your closing statement. Remind the jury of the single point they should remember. 2–3 sentences. Land the plane.",
+  };
+
+  return [
+    MODE_TONES[c.mode],
+    voice,
+    caseHeader(c),
+    `YOUR SIDE'S POSITION (grounding):\n"""${speaker.partyStory}"""`,
+    "TRIAL TRANSCRIPT SO FAR (most recent at bottom):",
+    recentTrial(messages, 10),
+    direction[role],
+    "Do not speak for anyone else. Do not issue a verdict. Do not address the jurors by name — they're observing silently.",
+  ].join("\n\n");
+}
+
+export function judgeTransitionPrompt(c: CasePayload): string {
+  return [
+    MODE_TONES[c.mode],
+    "You are JUDGE MARLOWE. Arguments have concluded. You dismiss the parties' counsel and send the jury to the deliberation room. One or two sentences. No stage directions.",
+    caseHeader(c),
+    "TASK: Close the trial and send the jury to deliberate. End with: 'The jury will now retire.'",
+  ].join("\n\n");
+}
+
+// ---- DELIBERATION PHASE ---------------------------------------------------
 
 export function jurorDeliberationPrompt(
   c: CasePayload,
@@ -83,16 +167,19 @@ export function jurorDeliberationPrompt(
 ): string {
   return [
     MODE_TONES[c.mode],
-    `You are ${juror.name}, a juror.`,
+    `You are ${juror.name}, a juror in the private deliberation room.`,
     `PERSONA: ${juror.persona}`,
     `VOICE STYLE: ${juror.voiceStyle}`,
-    caseContext(c),
+    "The trial is over. No lawyers or parties are in the room — just the jury.",
+    caseHeader(c),
+    "TRIAL TRANSCRIPT YOU JUST HEARD:",
+    trialTranscript(messages),
     "RECENT DELIBERATION (most recent last):",
-    recentExchange(messages),
+    recentDeliberation(messages, 6),
     [
-      "TASK: Respond in character with 1-3 sentences. Engage with what was just said — agree, disagree, push back, or add nuance.",
-      "Stay in your voice style. Don't narrate actions. Don't break character.",
-      "Do NOT vote yet — voting happens separately.",
+      "TASK: Speak in character, 1–3 sentences. React to what your fellow juror just said — agree, push back, add nuance.",
+      "Reference specific moments from the trial when it helps.",
+      "Stay in your voice style. Do NOT vote yet. Do not address lawyers or parties. Don't narrate actions.",
       "Never start with your own name.",
     ].join(" "),
   ].join("\n\n");
@@ -105,16 +192,21 @@ export function jurorVotePrompt(
 ): string {
   return [
     MODE_TONES[c.mode],
-    `You are ${juror.name}, casting your vote.`,
+    `You are ${juror.name}, casting your vote after deliberation.`,
     `PERSONA: ${juror.persona}`,
     `VOICE STYLE: ${juror.voiceStyle}`,
-    caseContext(c),
+    caseHeader(c),
+    "FULL TRIAL TRANSCRIPT:",
+    trialTranscript(messages),
     "FULL DELIBERATION:",
-    messages.map((m) => `[${m.speakerName}] ${m.content}`).join("\n"),
+    messages
+      .filter((m) => m.phase === "deliberation")
+      .map((m) => `[${m.speakerName}] ${m.content}`)
+      .join("\n"),
     [
-      "TASK: Deliver your verdict.",
-      "Start with exactly one of: FOR THE PLAINTIFF or FOR THE DEFENDANT (uppercase, no quotes).",
-      "Then on a new line, one sentence of reasoning in your voice style. No more than 25 words.",
+      "TASK: Cast your vote.",
+      "Line 1: exactly one of FOR THE PLAINTIFF or FOR THE DEFENDANT (uppercase).",
+      "Line 2: one sentence of reasoning in your voice style. No more than 25 words.",
     ].join(" "),
   ].join("\n\n");
 }
@@ -138,17 +230,17 @@ export function verdictSynthesisPrompt(
   return [
     MODE_TONES[c.mode],
     "You are JUDGE MARLOWE delivering the court's synthesized verdict.",
-    caseContext(c),
+    caseHeader(c),
     "JURY VOTES:",
     votes.map((v) => `- ${v.jurorName}: ${v.ruling.toUpperCase()} — ${v.reasoning}`).join("\n"),
     `VOTE TALLY: plaintiff ${tally.plaintiff}, defendant ${tally.defendant}. Winner: ${winner}.`,
     [
-      "TASK: Write a short synthesized verdict.",
-      "Line 1: THE COURT RULES: ... (one short, decisive sentence).",
-      "Line 2-3: reasoning, in the judge's voice. 2-3 sentences.",
+      "TASK: Write a short, decisive verdict.",
+      "Line 1: THE COURT RULES: <one sharp sentence>.",
+      "Lines 2–3: reasoning in the judge's voice (2–3 sentences).",
       c.mode === "real"
-        ? "Line 4 (optional): One sentence suggesting a path forward."
-        : "Line 4 (optional): One line of gavel-slamming closing.",
+        ? "Line 4 (optional): one sentence of practical guidance for going forward."
+        : "Line 4 (optional): one gavel-slamming closing line.",
     ].join(" "),
   ].join("\n\n");
 }
