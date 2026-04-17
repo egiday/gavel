@@ -10,6 +10,7 @@ import { Card } from "@/components/ui/card";
 import { JURORS, avatarUrl, getJuror } from "@/lib/jurors";
 import { getLawyer, lawyerAvatarUrl } from "@/lib/lawyers";
 import { useSettings } from "@/lib/store";
+import { gavel, tap } from "@/lib/haptics";
 import { ApiKeyModal } from "@/components/api-key-modal";
 import type {
   CasePayload,
@@ -169,9 +170,11 @@ export function DeliberationView({
     } else if (ev.type === "vote") {
       const { jurorId, jurorName, ruling, reasoning } = ev as unknown as VoteRecord;
       setVotes((prev) => [...prev, { jurorId, jurorName, ruling, reasoning }]);
+      tap();
     } else if (ev.type === "verdict") {
       const { ruling, summary, topQuote } = ev as unknown as VerdictRecord;
       onVerdict({ ruling, summary, topQuote, votes });
+      gavel();
     } else if (ev.type === "done") {
       setDone(true);
     } else if (ev.type === "error") {

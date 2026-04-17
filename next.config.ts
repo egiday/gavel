@@ -1,9 +1,10 @@
 import type { NextConfig } from "next";
-import path from "node:path";
 
 const nextConfig: NextConfig = {
+  // pin the workspace root so turbopack doesn't walk up past a stray
+  // package-lock.json in the home directory.
   turbopack: {
-    root: path.resolve(__dirname),
+    root: process.cwd(),
   },
   images: {
     remotePatterns: [
