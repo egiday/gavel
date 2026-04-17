@@ -90,9 +90,10 @@ export default function RootLayout({
     <html
       lang="en"
       suppressHydrationWarning
-      className={`${inter.variable} ${serif.variable} ${mono.variable} h-full antialiased`}
+      className={`dark ${inter.variable} ${serif.variable} ${mono.variable} h-full antialiased`}
     >
       <body className="min-h-full bg-background text-foreground font-sans flex flex-col [overscroll-behavior-y:contain]">
+        <div aria-hidden className="gv-grain" />
         <TooltipProvider>{children}</TooltipProvider>
         <Toaster richColors closeButton position="top-center" />
       </body>

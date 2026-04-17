@@ -13,7 +13,6 @@ import {
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { Card } from "@/components/ui/card";
 import { JURORS, avatarUrl, getJuror } from "@/lib/jurors";
 import { getLawyer, lawyerAvatarUrl } from "@/lib/lawyers";
 import { useSettings } from "@/lib/store";
@@ -244,14 +243,14 @@ export function DeliberationView({
       <div
         ref={scrollRef}
         onScroll={handleScroll}
-        className="relative flex-1 overflow-y-auto rounded-3xl border bg-card p-4 sm:p-5"
+        className="gv-card relative flex-1 overflow-y-auto rounded-3xl p-4 sm:p-5"
       >
         {messages.length === 0 && !running && (
           <div className="flex h-full flex-col items-center justify-center gap-4 py-14 text-center">
-            <Gavel className="size-10 text-muted-foreground" />
+            <Gavel className="size-10 text-white/40" />
             <div>
-              <p className="text-lg font-semibold">The jury is seated.</p>
-              <p className="text-sm text-muted-foreground">
+              <p className="text-lg font-semibold text-white">The jury is seated.</p>
+              <p className="text-sm text-white/55">
                 {spectator
                   ? "Waiting for the plaintiff to call court to order."
                   : "Hit the button below to call the session to order."}
@@ -275,27 +274,27 @@ export function DeliberationView({
                       transition={{ duration: 0.25 }}
                       className={`flex items-start gap-3 ${
                         m.phase === "trial" && isPartyOrCounsel(m.speakerType)
-                          ? "rounded-2xl border bg-muted/40 p-3"
+                          ? "rounded-2xl border border-white/10 bg-white/[0.03] p-3"
                           : ""
                       }`}
                     >
                       {renderAvatar(m)}
                       <div className="min-w-0 flex-1">
                         <div className="mb-0.5 flex items-baseline justify-between gap-2">
-                          <span className="truncate text-xs font-semibold">
+                          <span className="truncate text-xs font-semibold text-white">
                             {m.speakerName}
                           </span>
-                          <span className="shrink-0 text-[10px] uppercase tracking-widest text-muted-foreground">
+                          <span className="shrink-0 font-mono text-[10px] uppercase tracking-widest text-white/40">
                             {labelForSpeaker(m.speakerType, m.phase)}
                           </span>
                         </div>
                         <p
-                          className={`whitespace-pre-wrap break-words text-sm leading-snug ${
+                          className={`whitespace-pre-wrap break-words text-sm leading-snug text-white/85 ${
                             m.isVerdictVote ? "font-heading text-base" : ""
                           }`}
                         >
                           {m.content || (
-                            <span className="text-muted-foreground/60">…</span>
+                            <span className="text-white/30">…</span>
                           )}
                         </p>
                       </div>
@@ -309,11 +308,11 @@ export function DeliberationView({
       </div>
 
       {/* controls */}
-      <div className="sticky bottom-0 z-10 mt-4 border-t bg-background/95 px-1 pt-3 backdrop-blur-xl mb-safe">
+      <div className="sticky bottom-0 z-10 mt-4 border-t border-white/10 bg-background/95 px-1 pt-3 backdrop-blur-xl mb-safe">
         {!spectator && canStart && (
           <Button
             size="lg"
-            className="h-12 w-full rounded-full text-base font-semibold"
+            className="h-12 w-full rounded-full gv-glow text-base font-semibold"
             onClick={startDeliberation}
           >
             <PlayCircle className="size-5" />
@@ -321,18 +320,18 @@ export function DeliberationView({
           </Button>
         )}
         {spectator && !done && (
-          <div className="flex items-center justify-center gap-2 text-sm text-muted-foreground">
+          <div className="flex items-center justify-center gap-2 text-sm text-white/55">
             <Loader2 className="size-4 animate-spin" /> Watching the courtroom — auto-refreshing.
           </div>
         )}
         {running && (
-          <div className="flex items-center justify-center gap-2 text-sm text-muted-foreground">
+          <div className="flex items-center justify-center gap-2 text-sm text-white/55">
             <Loader2 className="size-4 animate-spin" /> Streaming… don&rsquo;t navigate away.
           </div>
         )}
         {done && votes.length > 0 && (
-          <Card className="p-3 text-sm">
-            <div className="mb-2 flex items-center gap-2 text-xs font-semibold uppercase tracking-widest text-muted-foreground">
+          <div className="gv-card rounded-2xl p-3 text-sm">
+            <div className="gv-mono-label mb-2 inline-flex items-center gap-2">
               <Gavel className="size-3.5" /> votes
             </div>
             <ul className="space-y-1">
@@ -341,12 +340,12 @@ export function DeliberationView({
                   key={v.jurorId}
                   className="flex items-start justify-between gap-2"
                 >
-                  <span className="font-medium">{v.jurorName}</span>
+                  <span className="font-medium text-white/90">{v.jurorName}</span>
                   <span
-                    className={`shrink-0 rounded-full px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wider ${
+                    className={`shrink-0 rounded-full px-2 py-0.5 font-mono text-[10px] font-semibold uppercase tracking-widest ${
                       v.ruling === "plaintiff"
-                        ? "bg-primary/10 text-primary"
-                        : "bg-muted text-foreground"
+                        ? "bg-primary/15 text-primary"
+                        : "bg-white/10 text-white/80"
                     }`}
                   >
                     {v.ruling}
@@ -354,13 +353,13 @@ export function DeliberationView({
                 </li>
               ))}
             </ul>
-          </Card>
+          </div>
         )}
         {!apiKey && !spectator && (
           <Button
             variant="ghost"
             size="sm"
-            className="mt-2 rounded-full"
+            className="mt-2 rounded-full text-white/60 hover:bg-white/5 hover:text-white"
             onClick={() => setKeyModal(true)}
           >
             <KeyRound className="size-3.5" /> Set Anthropic key
@@ -472,6 +471,12 @@ function PhaseBanner({ phase }: { phase: TrialPhase }) {
     ) : (
       <Gavel className="size-3.5" />
     );
+  const accent =
+    phase === "trial"
+      ? "text-amber-300 bg-amber-500/15"
+      : phase === "deliberation"
+        ? "text-blue-300 bg-blue-500/15"
+        : "text-primary bg-primary/15";
   const subtitle =
     phase === "trial"
       ? "Parties and counsel argue. The jury watches silently."
@@ -479,12 +484,12 @@ function PhaseBanner({ phase }: { phase: TrialPhase }) {
         ? "The jury is alone in the room. Lawyers dismissed."
         : "The verdict is rendered.";
   return (
-    <div className="sticky top-0 z-[5] -mx-4 sm:-mx-5 bg-card/95 px-4 pt-2 pb-3 backdrop-blur sm:px-5">
-      <div className="flex items-center gap-2 text-xs font-semibold uppercase tracking-widest text-muted-foreground">
+    <div className="sticky top-0 z-[5] -mx-4 bg-background/90 px-4 pt-2 pb-3 backdrop-blur sm:-mx-5 sm:px-5">
+      <div className={`inline-flex items-center gap-2 rounded-full ${accent} px-3 py-1 font-mono text-[10px] font-semibold uppercase tracking-[0.2em]`}>
         {icon}
-        <span className="text-foreground">{PHASE_LABELS[phase]}</span>
+        <span>{PHASE_LABELS[phase]}</span>
       </div>
-      <p className="mt-1 text-xs text-muted-foreground">{subtitle}</p>
+      <p className="mt-2 text-xs text-white/55">{subtitle}</p>
     </div>
   );
 }
@@ -504,12 +509,12 @@ function PhaseTracker({ phase, done }: { phase: TrialPhase; done: boolean }) {
                   ? "bg-primary"
                   : i === activeIdx
                     ? "animate-pulse bg-primary"
-                    : "bg-muted-foreground/30"
+                    : "bg-white/15"
               }`}
             />
             <span
-              className={`text-[10px] font-semibold uppercase tracking-widest ${
-                i <= activeIdx ? "text-foreground" : "text-muted-foreground/50"
+              className={`font-mono text-[10px] font-semibold uppercase tracking-[0.2em] ${
+                i <= activeIdx ? "text-white" : "text-white/30"
               }`}
             >
               {PHASE_LABELS[s]}
@@ -518,7 +523,7 @@ function PhaseTracker({ phase, done }: { phase: TrialPhase; done: boolean }) {
           {i < stages.length - 1 && (
             <span
               className={`h-px flex-1 ${
-                i < activeIdx ? "bg-primary" : "bg-border"
+                i < activeIdx ? "bg-primary" : "bg-white/10"
               }`}
             />
           )}

@@ -2,7 +2,6 @@ import { notFound } from "next/navigation";
 import Link from "next/link";
 import { Gavel, Scale, ExternalLink, Clock } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
-import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import {
@@ -73,73 +72,100 @@ export default async function VerdictPage({
     createdAt: r.createdAt.toISOString(),
   }));
 
-  const outerThemeClass = caseData.mode === "petty" ? "mode-petty dark" : "mode-real";
+  const themeClass = caseData.mode === "petty" ? "mode-petty" : "mode-real";
   const jury = JURORS.filter((j) => caseData.jurorIds.includes(j.id));
 
   return (
-    <div className={`min-h-dvh bg-background text-foreground ${outerThemeClass}`}>
-      <header className="safe-top border-b">
+    <div className={`relative min-h-dvh bg-background text-foreground ${themeClass}`}>
+      <div className="gv-spotlight" />
+
+      <header className="relative z-10 safe-top border-b border-white/10">
         <div className="mx-auto flex h-14 w-full max-w-3xl items-center justify-between px-4 safe-x">
-          <Link href="/" className="flex items-center gap-2 font-semibold">
-            <Scale className="size-5" />
+          <Link
+            href="/"
+            className="flex items-center gap-2 font-semibold text-white"
+          >
+            <span className="relative flex size-7 items-center justify-center rounded-lg bg-primary text-primary-foreground">
+              <Scale className="size-4" />
+            </span>
             Gavel
           </Link>
-          <Badge variant="outline" className="rounded-full text-[10px] uppercase tracking-widest">
+          <Badge
+            variant="outline"
+            className="rounded-full border-white/10 bg-white/5 font-mono text-[10px] uppercase tracking-widest text-white/70"
+          >
             public verdict
           </Badge>
         </div>
       </header>
 
-      <main className="mx-auto w-full max-w-3xl px-4 pb-16 pt-6 safe-x">
+      <main className="relative z-10 mx-auto w-full max-w-3xl px-4 pb-16 pt-8 safe-x">
         {verdict ? (
           <HeadlineVerdict caseData={caseData} verdict={verdict} />
         ) : (
-          <Card className="p-6 text-center">
-            <Clock className="mx-auto size-8 text-muted-foreground" />
-            <p className="mt-3 text-sm text-muted-foreground">
+          <div className="gv-card rounded-3xl p-8 text-center">
+            <Clock className="mx-auto size-8 text-white/40" />
+            <p className="mt-3 text-sm text-white/60">
               Court is still in session. Check back soon.
             </p>
-          </Card>
+          </div>
         )}
 
-        {/* receipts */}
         {messages.length > 0 && (
-          <section className="mt-8">
-            <div className="flex items-center justify-between">
-              <h2 className="font-heading text-2xl font-bold">Deliberation replay</h2>
-              <Badge variant="secondary" className="rounded-full text-[10px] uppercase tracking-widest">
-                full transcript
+          <section className="mt-10">
+            <div className="flex items-end justify-between">
+              <div>
+                <p className="gv-mono-label">full transcript</p>
+                <h2 className="mt-2 font-heading text-2xl font-bold text-white sm:text-3xl">
+                  Deliberation replay
+                </h2>
+              </div>
+              <Badge
+                variant="secondary"
+                className="rounded-full border-white/10 bg-white/5 font-mono text-[10px] uppercase tracking-widest text-white/70"
+              >
+                {messages.length} turns
               </Badge>
             </div>
-            <ol className="mt-4 space-y-3">
+            <ol className="mt-5 space-y-3">
               {messages.map((m) => {
                 const juror =
                   m.speakerType === "juror"
                     ? JURORS.find((j) => j.id === m.speakerId)
                     : null;
+                const phaseAccent =
+                  m.phase === "trial"
+                    ? "bg-amber-500/15 text-amber-300"
+                    : m.phase === "deliberation"
+                      ? "bg-blue-500/15 text-blue-300"
+                      : "bg-primary/15 text-primary";
                 return (
                   <li
                     key={m.id}
-                    className="flex items-start gap-3 rounded-2xl border bg-card p-4"
+                    className="gv-card flex items-start gap-3 rounded-2xl p-4"
                   >
                     {juror ? (
-                      <Avatar className="size-8 border">
+                      <Avatar className="size-8 border border-white/10">
                         <AvatarImage src={avatarUrl(juror)} alt={juror.name} />
                         <AvatarFallback>{juror.name[0]}</AvatarFallback>
                       </Avatar>
                     ) : (
-                      <div className="flex size-8 shrink-0 items-center justify-center rounded-full bg-muted text-xs font-bold">
-                        {m.speakerName[0]}
+                      <div className="flex size-8 shrink-0 items-center justify-center rounded-full bg-white/10 text-xs font-bold text-white/80">
+                        {(m.speakerName ?? "?")[0]}
                       </div>
                     )}
                     <div className="min-w-0">
-                      <div className="flex items-center gap-2 text-xs font-semibold">
-                        {m.speakerName}
-                        <span className="text-[10px] uppercase tracking-widest text-muted-foreground">
-                          {m.speakerType}
+                      <div className="flex flex-wrap items-center gap-2">
+                        <span className="text-xs font-semibold text-white">
+                          {m.speakerName}
+                        </span>
+                        <span
+                          className={`rounded-full px-1.5 py-0.5 font-mono text-[9px] font-semibold uppercase tracking-widest ${phaseAccent}`}
+                        >
+                          {m.phase}
                         </span>
                       </div>
-                      <p className="mt-1 whitespace-pre-wrap text-sm leading-relaxed">
+                      <p className="mt-1 whitespace-pre-wrap text-sm leading-relaxed text-white/85">
                         {m.content}
                       </p>
                     </div>
@@ -150,30 +176,29 @@ export default async function VerdictPage({
           </section>
         )}
 
-        {/* jury roster */}
         {jury.length > 0 && (
-          <section className="mt-10">
-            <h2 className="font-heading text-xl font-bold">Bench</h2>
+          <section className="mt-12">
+            <p className="gv-mono-label">the bench</p>
             <div className="mt-3 flex flex-wrap gap-2">
               {jury.map((j) => (
                 <div
                   key={j.id}
-                  className="flex items-center gap-2 rounded-full border bg-card py-1 pl-1 pr-3"
+                  className="flex items-center gap-2 rounded-full border border-white/10 bg-white/5 py-1 pl-1 pr-3"
                 >
                   <Avatar className="size-6">
                     <AvatarImage src={avatarUrl(j)} alt={j.name} />
                     <AvatarFallback>{j.name[0]}</AvatarFallback>
                   </Avatar>
-                  <span className="text-xs font-semibold">{j.name}</span>
+                  <span className="text-xs font-semibold text-white">{j.name}</span>
                 </div>
               ))}
             </div>
           </section>
         )}
 
-        <div className="mt-10 flex flex-col items-center justify-center gap-3 border-t pt-10 text-center">
-          <p className="text-sm text-muted-foreground">Got beef? File your own.</p>
-          <Button asChild className="rounded-full">
+        <div className="mt-12 flex flex-col items-center justify-center gap-3 border-t border-white/10 pt-10 text-center">
+          <p className="text-sm text-white/60">Got beef? File your own.</p>
+          <Button asChild className="rounded-full gv-glow">
             <Link href="/case/new">
               File a case <ExternalLink className="size-3.5" />
             </Link>
@@ -204,43 +229,52 @@ function HeadlineVerdict({
         : "SPLIT DECISION";
 
   return (
-    <Card className="relative overflow-hidden p-6 sm:p-8">
-      <div className="absolute inset-x-0 top-0 h-1 bg-primary" />
-      <div className="flex items-center justify-between">
-        <Badge variant="outline" className="rounded-full text-[10px] uppercase tracking-widest">
+    <div className="gv-card relative overflow-hidden rounded-3xl p-6 sm:p-10">
+      <div
+        aria-hidden
+        className="pointer-events-none absolute -inset-x-10 -top-20 h-52 opacity-70"
+        style={{
+          background:
+            "radial-gradient(600px 220px at 50% 0%, rgba(255,180,80,0.18), transparent 70%)",
+        }}
+      />
+      <div className="absolute inset-x-0 top-0 h-0.5 bg-primary" />
+      <div className="relative flex items-center justify-between gap-3">
+        <Badge
+          variant="outline"
+          className="rounded-full border-white/10 bg-white/5 font-mono text-[10px] uppercase tracking-widest text-white/70"
+        >
           {caseData.mode} · {tally.plaintiff + tally.defendant}-juror bench
         </Badge>
-        <div className="flex items-center gap-2 text-xs text-muted-foreground">
+        <div className="flex items-center gap-2 font-mono text-xs text-white/50">
           <Gavel className="size-3.5" /> verdict rendered
         </div>
       </div>
-      <h1 className="mt-4 font-heading text-3xl font-bold tracking-tight sm:text-4xl">
+      <h1 className="relative mt-4 font-heading text-3xl font-bold tracking-tight text-white sm:text-5xl">
         {caseData.title}
       </h1>
-      <div className="mt-5 rounded-2xl border bg-primary/5 p-5">
-        <p className="text-[10px] font-semibold uppercase tracking-widest text-muted-foreground">
-          the court rules
-        </p>
-        <p className="mt-1 font-heading text-4xl font-black tracking-tight sm:text-5xl">
+      <div className="relative mt-5 rounded-2xl border border-primary/40 bg-primary/10 p-5">
+        <p className="gv-mono-label">the court rules</p>
+        <p className="mt-1 font-heading text-4xl font-black tracking-tight text-white sm:text-6xl">
           {winnerLabel}
         </p>
-        <div className="mt-3 flex items-center gap-3 text-xs text-muted-foreground">
-          <span className="rounded-full bg-background px-2 py-0.5 font-mono">
+        <div className="mt-3 flex items-center gap-3 text-xs text-white/60">
+          <span className="rounded-full border border-white/10 bg-background px-2 py-0.5 font-mono">
             {tally.plaintiff}-{tally.defendant}
           </span>
           <span>final vote</span>
         </div>
       </div>
-      <div className="mt-5 space-y-3 text-base leading-relaxed">
+      <div className="relative mt-5 space-y-3 text-base leading-relaxed text-white/80">
         {verdict.summary.split("\n").map((line, i) => (
           <p key={i}>{line}</p>
         ))}
       </div>
       {verdict.topQuote && (
-        <blockquote className="mt-5 border-l-4 border-primary/60 pl-4 text-sm italic text-muted-foreground">
+        <blockquote className="relative mt-5 border-l-4 border-primary/60 pl-4 text-sm italic text-white/60">
           {verdict.topQuote}
         </blockquote>
       )}
-    </Card>
+    </div>
   );
 }

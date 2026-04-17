@@ -2,7 +2,6 @@
 
 import { useState } from "react";
 import { Scale, UserRound, Check, Loader2 } from "lucide-react";
-import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { LAWYERS, lawyerAvatarUrl } from "@/lib/lawyers";
@@ -48,23 +47,23 @@ export function LawyerPicker({ caseData, side, onPicked }: Props) {
   }
 
   return (
-    <div className="space-y-5">
+    <div className="space-y-6">
       <div className="text-center">
-        <h2 className="font-heading text-2xl font-bold tracking-tight sm:text-3xl">
+        <p className="gv-mono-label">pick your counsel</p>
+        <h2 className="mt-3 font-heading text-3xl font-bold tracking-tight text-white sm:text-4xl">
           {side === "plaintiff" ? "Your counsel" : "Defendant's counsel"}
         </h2>
-        <p className="mt-1 text-sm text-muted-foreground">
+        <p className="mt-2 text-sm text-white/60">
           Defend yourself, or let an AI lawyer argue on your behalf.
         </p>
       </div>
 
       <div className="grid gap-3 sm:grid-cols-2">
-        {/* self-defense option */}
         <Option
           active={selected === SELF}
           onClick={() => setSelected(SELF)}
           avatar={
-            <div className="flex size-12 items-center justify-center rounded-full border bg-muted">
+            <div className="flex size-12 items-center justify-center rounded-full border border-white/10 bg-white/5 text-white">
               <UserRound className="size-5" />
             </div>
           }
@@ -72,14 +71,13 @@ export function LawyerPicker({ caseData, side, onPicked }: Props) {
           tagline="Your own words go straight to the jury."
         />
 
-        {/* AI lawyers */}
         {LAWYERS.map((l) => (
           <Option
             key={l.id}
             active={selected === l.id}
             onClick={() => setSelected(l.id)}
             avatar={
-              <Avatar className="size-12 border">
+              <Avatar className="size-12 border-2 border-white/10">
                 <AvatarImage src={lawyerAvatarUrl(l)} alt={l.name} />
                 <AvatarFallback>{l.name[0]}</AvatarFallback>
               </Avatar>
@@ -92,7 +90,7 @@ export function LawyerPicker({ caseData, side, onPicked }: Props) {
 
       <Button
         size="lg"
-        className="h-12 w-full rounded-full text-base font-semibold"
+        className="h-12 w-full rounded-full gv-glow text-base font-semibold"
         onClick={handleSave}
         disabled={saving}
       >
@@ -127,19 +125,21 @@ function Option({
     <button
       type="button"
       onClick={onClick}
-      className={`flex items-center gap-3 rounded-2xl border p-4 text-left transition-colors ${
-        active ? "border-primary bg-primary/5 shadow-sm" : "hover:bg-muted"
+      className={`relative flex items-center gap-3 rounded-2xl border p-4 text-left transition-all ${
+        active
+          ? "border-primary/60 bg-primary/10 shadow-[0_0_30px_-10px_theme(colors.primary/60)]"
+          : "border-white/10 bg-white/[0.02] hover:border-white/20 hover:bg-white/[0.05]"
       }`}
     >
       {avatar}
-      <div className="flex-1">
-        <div className="text-sm font-semibold">{title}</div>
-        <div className="text-xs text-muted-foreground">{tagline}</div>
+      <div className="min-w-0 flex-1">
+        <div className="text-sm font-semibold text-white">{title}</div>
+        <div className="truncate text-xs text-white/55">{tagline}</div>
       </div>
       {active && (
-        <Card className="flex size-6 items-center justify-center rounded-full bg-primary text-primary-foreground">
+        <div className="flex size-6 shrink-0 items-center justify-center rounded-full bg-primary text-primary-foreground">
           <Check className="size-3" />
-        </Card>
+        </div>
       )}
     </button>
   );

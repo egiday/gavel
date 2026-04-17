@@ -5,7 +5,6 @@ import { AnimatePresence, motion } from "framer-motion";
 import { ChevronDown, ChevronUp, MessageCircle, Send } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { Card } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import type { ChatLine } from "@/lib/types";
 
@@ -25,7 +24,6 @@ export function ChatPanel({ caseId, defaultOpen = false }: Props) {
   const scrollRef = useRef<HTMLDivElement | null>(null);
   const lastAt = useRef<string | null>(null);
 
-  // load/persist display name
   useEffect(() => {
     if (typeof window === "undefined") return;
     setName(window.localStorage.getItem(NAME_KEY) ?? "");
@@ -35,19 +33,21 @@ export function ChatPanel({ caseId, defaultOpen = false }: Props) {
     if (name) window.localStorage.setItem(NAME_KEY, name);
   }, [name]);
 
-  // initial load + interval poll
   useEffect(() => {
     let cancelled = false;
-
     async function pull() {
-      const qs = lastAt.current ? `?since=${encodeURIComponent(lastAt.current)}` : "";
+      const qs = lastAt.current
+        ? `?since=${encodeURIComponent(lastAt.current)}`
+        : "";
       try {
         const res = await fetch(`/api/cases/${caseId}/chat${qs}`);
         if (!res.ok) return;
         const data: { messages: ChatLine[] } = await res.json();
         if (cancelled) return;
         if (data.messages.length > 0) {
-          setMessages((prev) => mergeBy(prev, data.messages, (m) => m.id));
+          setMessages((prev) =>
+            mergeBy(prev, data.messages, (m) => m.id),
+          );
           lastAt.current = data.messages[data.messages.length - 1].createdAt;
         }
       } catch {
@@ -87,37 +87,39 @@ export function ChatPanel({ caseId, defaultOpen = false }: Props) {
     }
   }, [caseId, draft, name, sending]);
 
-  const recent = useMemo(
-    () => messages.slice(-80),
-    [messages],
-  );
+  const recent = useMemo(() => messages.slice(-80), [messages]);
 
   return (
-    <Card className="flex flex-col overflow-hidden p-0">
+    <div className="gv-card flex flex-col overflow-hidden rounded-3xl">
       <button
         type="button"
         onClick={() => setOpen((v) => !v)}
-        className="flex items-center justify-between gap-3 px-4 py-3 text-left transition-colors hover:bg-muted/50"
+        className="flex items-center justify-between gap-3 px-4 py-3 text-left transition-colors hover:bg-white/[0.04]"
       >
-        <div className="flex items-center gap-2">
-          <MessageCircle className="size-4 text-primary" />
+        <div className="flex items-center gap-3">
+          <div className="flex size-9 items-center justify-center rounded-xl bg-primary/15 text-primary">
+            <MessageCircle className="size-4" />
+          </div>
           <div>
-            <div className="text-sm font-semibold">Peanut gallery</div>
-            <div className="text-xs text-muted-foreground">
-              Live chat — audience only, jury can&rsquo;t see this.
+            <div className="text-sm font-semibold text-white">Peanut gallery</div>
+            <div className="text-xs text-white/50">
+              Live chat — audience only. Jury can&rsquo;t see this.
             </div>
           </div>
         </div>
         <div className="flex items-center gap-2">
           {messages.length > 0 && (
-            <Badge variant="secondary" className="rounded-full font-mono text-[10px]">
+            <Badge
+              variant="secondary"
+              className="rounded-full border border-white/10 bg-white/5 font-mono text-[10px] uppercase tracking-widest text-white/70"
+            >
               {messages.length}
             </Badge>
           )}
           {open ? (
-            <ChevronDown className="size-4 text-muted-foreground" />
+            <ChevronDown className="size-4 text-white/50" />
           ) : (
-            <ChevronUp className="size-4 text-muted-foreground" />
+            <ChevronUp className="size-4 text-white/50" />
           )}
         </div>
       </button>
@@ -129,24 +131,24 @@ export function ChatPanel({ caseId, defaultOpen = false }: Props) {
             animate={{ height: "auto", opacity: 1 }}
             exit={{ height: 0, opacity: 0 }}
             transition={{ duration: 0.25, ease: [0.2, 0.8, 0.2, 1] }}
-            className="overflow-hidden border-t"
+            className="overflow-hidden border-t border-white/10"
           >
             <div
               ref={scrollRef}
               className="max-h-64 overflow-y-auto px-4 py-3"
             >
               {recent.length === 0 ? (
-                <p className="py-6 text-center text-xs text-muted-foreground">
+                <p className="py-6 text-center text-xs text-white/45">
                   No chatter yet. Be the loudest in the room.
                 </p>
               ) : (
                 <ul className="space-y-2">
                   {recent.map((m) => (
                     <li key={m.id} className="flex items-start gap-2 text-sm">
-                      <span className="shrink-0 text-xs font-semibold text-primary/80">
+                      <span className="shrink-0 font-mono text-[11px] font-semibold text-primary/90">
                         {m.displayName}
                       </span>
-                      <span className="break-words leading-snug">
+                      <span className="break-words leading-snug text-white/85">
                         {m.content}
                       </span>
                     </li>
@@ -155,13 +157,13 @@ export function ChatPanel({ caseId, defaultOpen = false }: Props) {
               )}
             </div>
 
-            <div className="border-t bg-muted/30 p-3">
+            <div className="border-t border-white/10 bg-white/[0.02] p-3">
               <div className="mb-2 flex items-center gap-2">
                 <Input
                   value={name}
                   onChange={(e) => setName(e.target.value.slice(0, 24))}
                   placeholder="your name (or stay anonymous)"
-                  className="h-8 flex-1 text-xs"
+                  className="h-8 flex-1 border-white/10 bg-white/5 text-xs"
                   maxLength={24}
                   autoComplete="nickname"
                 />
@@ -177,7 +179,7 @@ export function ChatPanel({ caseId, defaultOpen = false }: Props) {
                     }
                   }}
                   placeholder="drop a take…"
-                  className="h-10 flex-1"
+                  className="h-10 flex-1 border-white/10 bg-white/5"
                   maxLength={240}
                 />
                 <Button
@@ -193,7 +195,7 @@ export function ChatPanel({ caseId, defaultOpen = false }: Props) {
           </motion.div>
         )}
       </AnimatePresence>
-    </Card>
+    </div>
   );
 }
 

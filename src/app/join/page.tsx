@@ -6,7 +6,6 @@ import Link from "next/link";
 import { ChevronLeft, ScanLine, Shield, Eye } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { Card } from "@/components/ui/card";
 import { Label } from "@/components/ui/label";
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { toast } from "sonner";
@@ -32,66 +31,73 @@ export default function JoinPage() {
         toast.error("No case matching that code");
         return;
       }
-      if (intent === "spectate") {
-        router.push(`/case/${c}`);
-      } else {
-        router.push(`/join/${c}`);
-      }
+      if (intent === "spectate") router.push(`/case/${c}`);
+      else router.push(`/join/${c}`);
     } finally {
       setLoading(false);
     }
   }
 
   return (
-    <div className="flex min-h-dvh flex-col">
-      <header className="sticky top-0 z-20 safe-top border-b bg-background/80 backdrop-blur-xl">
+    <div className="relative flex min-h-dvh flex-col bg-background text-foreground">
+      <div className="gv-spotlight" />
+
+      <header className="sticky top-0 z-20 safe-top border-b border-white/10 bg-background/70 backdrop-blur-xl">
         <div className="mx-auto flex h-14 w-full max-w-2xl items-center justify-between px-4 safe-x">
           <Button variant="ghost" size="sm" asChild>
             <Link href="/">
               <ChevronLeft className="size-4" /> Home
             </Link>
           </Button>
-          <h1 className="font-heading text-base font-bold">Join a case</h1>
+          <h1 className="font-heading text-base font-bold text-white">Join a case</h1>
           <div className="w-16" />
         </div>
       </header>
 
-      <main className="mx-auto flex w-full max-w-md flex-1 flex-col items-center justify-center px-4 safe-x">
-        <Card className="w-full p-6 sm:p-8">
+      <main className="relative z-10 mx-auto flex w-full max-w-md flex-1 flex-col items-center justify-center px-4 py-10 safe-x">
+        <div className="mb-6 text-center">
+          <p className="gv-mono-label">the gallery is open</p>
+          <h2 className="mt-3 font-heading text-3xl font-black tracking-tight text-white sm:text-4xl">
+            Step inside the courtroom.
+          </h2>
+          <p className="mt-2 text-sm text-white/60">
+            Six characters. Defend yourself, or watch from the gallery.
+          </p>
+        </div>
+
+        <div className="gv-card w-full rounded-3xl p-6 sm:p-8">
           <div className="flex flex-col items-center text-center">
-            <div className="flex size-14 items-center justify-center rounded-2xl bg-primary/10 text-primary">
+            <div className="flex size-14 items-center justify-center rounded-2xl bg-primary/15 text-primary">
               <ScanLine className="size-6" />
             </div>
-            <h2 className="mt-4 font-heading text-2xl font-bold">Enter the case code</h2>
-            <p className="mt-1 text-sm text-muted-foreground">
-              Six characters. Defend, or watch from the gallery.
-            </p>
           </div>
 
           <div className="mt-6 space-y-4">
             <Tabs value={intent} onValueChange={(v) => setIntent(v as Intent)}>
-              <TabsList className="grid h-11 w-full grid-cols-2 rounded-full">
+              <TabsList className="grid h-11 w-full grid-cols-2 rounded-full border border-white/10 bg-white/5">
                 <TabsTrigger
                   value="defend"
-                  className="rounded-full text-sm font-semibold data-[state=active]:shadow"
+                  className="rounded-full text-sm font-semibold data-[state=active]:bg-primary data-[state=active]:text-primary-foreground data-[state=active]:shadow"
                 >
                   <Shield className="size-4" /> Defend
                 </TabsTrigger>
                 <TabsTrigger
                   value="spectate"
-                  className="rounded-full text-sm font-semibold data-[state=active]:shadow"
+                  className="rounded-full text-sm font-semibold data-[state=active]:bg-primary data-[state=active]:text-primary-foreground data-[state=active]:shadow"
                 >
                   <Eye className="size-4" /> Spectate
                 </TabsTrigger>
               </TabsList>
             </Tabs>
-            <p className="text-center text-xs text-muted-foreground">
+            <p className="text-center text-xs text-white/55">
               {intent === "defend"
                 ? "File your response and argue in court."
                 : "Watch the trial unfold. Chat with other spectators live."}
             </p>
 
-            <Label htmlFor="code" className="sr-only">Case code</Label>
+            <Label htmlFor="code" className="sr-only">
+              Case code
+            </Label>
             <Input
               id="code"
               inputMode="text"
@@ -101,10 +107,10 @@ export default function JoinPage() {
               onChange={(e) => setCode(e.target.value.toUpperCase())}
               placeholder="ABC123"
               maxLength={6}
-              className="h-14 text-center font-mono text-2xl font-black tracking-[0.4em]"
+              className="h-14 border-white/15 bg-white/5 text-center font-mono text-2xl font-black tracking-[0.4em] text-white"
             />
             <Button
-              className="h-12 w-full rounded-full text-base font-semibold"
+              className="h-12 w-full rounded-full gv-glow text-base font-semibold"
               onClick={handleJoin}
               disabled={loading || code.length !== 6}
             >
@@ -115,7 +121,7 @@ export default function JoinPage() {
                   : "Continue to watch"}
             </Button>
           </div>
-        </Card>
+        </div>
       </main>
     </div>
   );

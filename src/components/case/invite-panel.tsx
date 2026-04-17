@@ -11,7 +11,6 @@ import {
   Sparkles,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
-import { Card } from "@/components/ui/card";
 import {
   Dialog,
   DialogContent,
@@ -79,22 +78,31 @@ export function InvitePanel({ caseData, onStartSolo }: Props) {
   return (
     <div className="space-y-6">
       <div className="text-center">
-        <h2 className="font-heading text-3xl font-bold tracking-tight sm:text-4xl">
-          Summon the defendant
+        <p className="gv-mono-label">summon the defendant</p>
+        <h2 className="mt-3 font-heading text-3xl font-bold tracking-tight text-white sm:text-4xl">
+          Drop the code. Watch them join.
         </h2>
-        <p className="mt-2 text-sm text-muted-foreground">
-          Share the code or link. They&rsquo;ll read your side, then write theirs.
+        <p className="mt-2 text-sm text-white/60">
+          Share the six-character code or the link. They read your side, file theirs.
         </p>
       </div>
 
-      <Card className="relative overflow-hidden p-6">
-        <div className="flex flex-col items-center gap-5">
-          <div className="text-xs font-semibold uppercase tracking-widest text-muted-foreground">
-            case code
-          </div>
+      <div className="gv-card relative overflow-hidden rounded-3xl p-6 sm:p-8">
+        {/* ambient glow */}
+        <div
+          aria-hidden
+          className="pointer-events-none absolute -inset-x-10 -top-20 h-48 opacity-60"
+          style={{
+            background:
+              "radial-gradient(600px 200px at 50% 0%, rgba(255,180,80,0.15), transparent 70%)",
+          }}
+        />
+
+        <div className="relative flex flex-col items-center gap-5">
+          <div className="gv-mono-label">case code</div>
           <button
             onClick={copyCode}
-            className="group inline-flex items-center gap-2 font-mono text-5xl font-black tracking-widest transition-colors hover:text-primary sm:text-6xl"
+            className="group inline-flex items-center gap-3 font-mono text-5xl font-black tracking-[0.3em] text-white transition-colors hover:text-primary sm:text-6xl"
             aria-label="Copy code"
           >
             {caseData.shareCode}
@@ -106,12 +114,15 @@ export function InvitePanel({ caseData, onStartSolo }: Props) {
           </button>
 
           <div className="flex w-full flex-col gap-2 sm:flex-row sm:justify-center">
-            <Button className="h-11 w-full rounded-full sm:w-auto" onClick={nativeShare}>
+            <Button
+              className="h-11 w-full rounded-full gv-glow sm:w-auto"
+              onClick={nativeShare}
+            >
               <Share2 className="size-4" /> Share invite
             </Button>
             <Button
               variant="outline"
-              className="h-11 w-full rounded-full sm:w-auto"
+              className="h-11 w-full rounded-full border-white/15 bg-white/5 sm:w-auto"
               asChild
             >
               <a href={imessageHref}>
@@ -120,7 +131,10 @@ export function InvitePanel({ caseData, onStartSolo }: Props) {
             </Button>
             <Dialog>
               <DialogTrigger asChild>
-                <Button variant="outline" className="h-11 w-full rounded-full sm:w-auto">
+                <Button
+                  variant="outline"
+                  className="h-11 w-full rounded-full border-white/15 bg-white/5 sm:w-auto"
+                >
                   <QrCode className="size-4" /> QR
                 </Button>
               </DialogTrigger>
@@ -140,7 +154,7 @@ export function InvitePanel({ caseData, onStartSolo }: Props) {
 
           <button
             onClick={copyLink}
-            className="group mt-2 flex w-full items-center justify-between gap-3 rounded-xl border bg-muted/40 px-3 py-2 font-mono text-xs text-muted-foreground transition-colors hover:bg-muted"
+            className="group mt-2 flex w-full items-center justify-between gap-3 rounded-xl border border-white/10 bg-white/[0.03] px-3 py-2 font-mono text-xs text-white/60 transition-colors hover:bg-white/[0.06]"
           >
             <span className="truncate">{joinUrl}</span>
             {copiedLink ? (
@@ -150,13 +164,13 @@ export function InvitePanel({ caseData, onStartSolo }: Props) {
             )}
           </button>
         </div>
-      </Card>
+      </div>
 
       {onStartSolo && (
         <div className="text-center">
           <Button
             variant="ghost"
-            className="rounded-full text-sm text-muted-foreground hover:text-foreground"
+            className="rounded-full text-sm text-white/60 hover:bg-white/5 hover:text-white"
             onClick={onStartSolo}
           >
             <Sparkles className="size-4" /> Run solo instead — AI plays the defendant

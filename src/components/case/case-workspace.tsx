@@ -4,7 +4,6 @@ import { useEffect, useState } from "react";
 import Link from "next/link";
 import { ChevronLeft, Users, FileText } from "lucide-react";
 import { Button } from "@/components/ui/button";
-import { Card } from "@/components/ui/card";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { InvitePanel } from "@/components/case/invite-panel";
 import { LawyerPicker } from "@/components/case/lawyer-picker";
@@ -78,45 +77,47 @@ export function CaseWorkspace(props: Props) {
   const jury = JURORS.filter((j) => caseData.jurorIds.includes(j.id));
 
   return (
-    <div className={`flex min-h-dvh flex-col bg-background text-foreground ${outerThemeClass}`}>
-      <header className="sticky top-0 z-20 safe-top border-b bg-background/80 backdrop-blur-xl">
-        <div className="mx-auto flex h-14 w-full max-w-4xl items-center justify-between px-4 safe-x">
+    <div className={`relative flex min-h-dvh flex-col bg-background text-foreground ${outerThemeClass}`}>
+      <div className="gv-spotlight" />
+
+      <header className="sticky top-0 z-20 safe-top border-b border-white/10 bg-background/70 backdrop-blur-xl">
+        <div className="mx-auto flex h-14 w-full max-w-4xl items-center justify-between gap-3 px-4 safe-x">
           <Button variant="ghost" size="sm" asChild>
             <Link href="/">
               <ChevronLeft className="size-4" /> Home
             </Link>
           </Button>
-          <div className="flex-1 truncate text-center font-heading text-sm font-bold tracking-tight">
+          <div className="min-w-0 flex-1 truncate text-center font-heading text-sm font-bold tracking-tight text-white">
             {caseData.title}
           </div>
-          <div className="w-16 text-right text-xs font-mono text-muted-foreground">
+          <div className="w-20 text-right font-mono text-[10px] uppercase tracking-widest text-white/50">
             #{caseData.shareCode}
           </div>
         </div>
       </header>
 
-      <main className="mx-auto flex w-full max-w-4xl flex-1 flex-col px-4 pb-10 pt-6 safe-x">
+      <main className="relative z-10 mx-auto flex w-full max-w-4xl flex-1 flex-col px-4 pb-10 pt-6 safe-x">
         {/* jury strip */}
-        <div className="mb-5 rounded-3xl border bg-card p-3 sm:p-4">
+        <div className="gv-card mb-5 rounded-3xl p-4 sm:p-5">
           <div className="flex items-center justify-between gap-3">
-            <div className="flex items-center gap-2 text-xs font-semibold uppercase tracking-widest text-muted-foreground">
+            <div className="gv-mono-label inline-flex items-center gap-2">
               <Users className="size-3.5" /> empaneled jury
             </div>
-            <span className="font-mono text-xs text-muted-foreground">
-              {jury.length}/5
+            <span className="font-mono text-xs text-white/50">
+              {jury.length}/5 sworn
             </span>
           </div>
           <div className="mt-3 flex flex-wrap items-center gap-2">
             {jury.map((j) => (
               <div
                 key={j.id}
-                className="flex items-center gap-2 rounded-full border bg-background py-1 pl-1 pr-3"
+                className="flex items-center gap-2 rounded-full border border-white/10 bg-white/5 py-1 pl-1 pr-3"
               >
                 <Avatar className="size-6">
                   <AvatarImage src={avatarUrl(j)} alt={j.name} />
                   <AvatarFallback>{j.name[0]}</AvatarFallback>
                 </Avatar>
-                <span className="text-xs font-semibold">{j.name}</span>
+                <span className="text-xs font-semibold text-white">{j.name}</span>
               </div>
             ))}
           </div>
@@ -126,18 +127,18 @@ export function CaseWorkspace(props: Props) {
         {verdict && caseData.status === "verdict" ? (
           <VerdictCard caseData={caseData} verdict={verdict} />
         ) : isSpectator && awaitingDefendant ? (
-          <Card className="p-6 text-center">
-            <FileText className="mx-auto size-10 text-muted-foreground" />
-            <h2 className="mt-3 font-heading text-2xl font-bold">
+          <div className="gv-card rounded-3xl p-8 text-center">
+            <FileText className="mx-auto size-10 text-white/40" />
+            <h2 className="mt-4 font-heading text-2xl font-bold text-white">
               Case filed — defendant hasn&rsquo;t responded yet
             </h2>
-            <p className="mt-2 text-sm text-muted-foreground">
+            <p className="mt-2 text-sm text-white/60">
               This page will update automatically as the parties file.
             </p>
-            <p className="mt-4 text-xs font-mono text-muted-foreground">
+            <p className="mt-5 font-mono text-[11px] uppercase tracking-widest text-white/50">
               code · {caseData.shareCode}
             </p>
-          </Card>
+          </div>
         ) : isSpectator ? (
           <DeliberationView
             caseData={caseData}
@@ -149,18 +150,18 @@ export function CaseWorkspace(props: Props) {
         ) : awaitingDefendant && youRole !== "defendant" ? (
           <InvitePanel caseData={caseData} />
         ) : awaitingDefendant && youRole === "defendant" ? (
-          <Card className="p-6 text-center">
-            <FileText className="mx-auto size-10 text-muted-foreground" />
-            <h2 className="mt-3 font-heading text-2xl font-bold">
+          <div className="gv-card rounded-3xl p-8 text-center">
+            <FileText className="mx-auto size-10 text-white/40" />
+            <h2 className="mt-4 font-heading text-2xl font-bold text-white">
               Defend your side
             </h2>
-            <p className="mt-2 text-sm text-muted-foreground">
+            <p className="mt-2 text-sm text-white/60">
               Head to the defendant form to file your response.
             </p>
-            <Button asChild className="mt-4 rounded-full">
+            <Button asChild className="mt-5 rounded-full">
               <Link href={`/join/${caseData.shareCode}`}>Go to defendant form</Link>
             </Button>
-          </Card>
+          </div>
         ) : needsLawyerPick && youRole ? (
           <LawyerPicker
             caseData={caseData}
@@ -168,15 +169,17 @@ export function CaseWorkspace(props: Props) {
             onPicked={handleLawyerPicked}
           />
         ) : waitingOnCounterparty ? (
-          <Card className="p-6 text-center">
-            <p className="font-heading text-xl font-bold">Waiting on the other side…</p>
-            <p className="mt-2 text-sm text-muted-foreground">
+          <div className="gv-card rounded-3xl p-8 text-center">
+            <p className="font-heading text-2xl font-bold text-white">
+              Waiting on the other side…
+            </p>
+            <p className="mt-2 text-sm text-white/60">
               They still need to pick self-defense or counsel before trial begins.
             </p>
-            <p className="mt-4 text-xs font-mono text-muted-foreground">
-              This page updates automatically.
+            <p className="mt-5 font-mono text-[11px] uppercase tracking-widest text-white/50">
+              this page updates automatically
             </p>
-          </Card>
+          </div>
         ) : (
           <DeliberationView
             caseData={caseData}
@@ -189,23 +192,21 @@ export function CaseWorkspace(props: Props) {
         {/* case context footer */}
         {showingDeliberation && (
           <div className="mt-6 grid gap-3 sm:grid-cols-2">
-            <Card className="p-4">
-              <div className="flex items-center gap-2 text-xs font-semibold uppercase tracking-widest text-muted-foreground">
-                plaintiff
-              </div>
-              <p className="mt-2 text-sm leading-relaxed">{caseData.plaintiffSide}</p>
-            </Card>
-            <Card className="p-4">
-              <div className="flex items-center gap-2 text-xs font-semibold uppercase tracking-widest text-muted-foreground">
-                defendant
-              </div>
-              <p className="mt-2 text-sm leading-relaxed">
+            <div className="gv-card rounded-2xl p-4">
+              <div className="gv-mono-label">plaintiff filed</div>
+              <p className="mt-2 text-sm leading-relaxed text-white/80">
+                {caseData.plaintiffSide}
+              </p>
+            </div>
+            <div className="gv-card rounded-2xl p-4">
+              <div className="gv-mono-label">defendant filed</div>
+              <p className="mt-2 text-sm leading-relaxed text-white/80">
                 {caseData.defendantSide ??
                   (caseData.absentDefendant
-                    ? "The defendant is absent. A devil's advocate will steelman their position."
+                    ? "The defendant is absent. A devil's advocate steelmans their position."
                     : "Defendant has not yet filed a response.")}
               </p>
-            </Card>
+            </div>
           </div>
         )}
 

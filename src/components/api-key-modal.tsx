@@ -19,7 +19,6 @@ import { toast } from "sonner";
 interface ApiKeyModalProps {
   open: boolean;
   onOpenChange: (v: boolean) => void;
-  /** fires once a valid-looking key is saved */
   onSaved?: (key: string) => void;
 }
 
@@ -47,24 +46,24 @@ export function ApiKeyModal({ open, onOpenChange, onSaved }: ApiKeyModalProps) {
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-w-md">
+      <DialogContent className="max-w-md border-white/10 bg-background sm:max-w-md">
         <DialogHeader>
-          <div className="mx-auto flex size-12 items-center justify-center rounded-2xl bg-primary/10 text-primary">
+          <div className="mx-auto flex size-12 items-center justify-center rounded-2xl bg-primary/15 text-primary shadow-[0_0_30px_-10px_theme(colors.primary/60)]">
             <KeyRound className="size-5" />
           </div>
-          <DialogTitle className="text-center text-xl font-bold">
-            Bring your own Anthropic key
+          <DialogTitle className="text-center font-heading text-2xl font-bold text-white">
+            Bring your own key
           </DialogTitle>
-          <DialogDescription className="text-center text-sm text-muted-foreground">
-            Gavel runs on your key. It&rsquo;s stored only in your browser.
+          <DialogDescription className="text-center text-sm text-white/60">
+            Gavel runs on your Anthropic key. Stored only in your browser.
             We never see it.
           </DialogDescription>
         </DialogHeader>
 
         <div className="space-y-4">
           <div className="space-y-2">
-            <Label htmlFor="apikey" className="text-sm font-semibold">
-              API Key
+            <Label htmlFor="apikey" className="gv-mono-label">
+              Api Key
             </Label>
             <Input
               id="apikey"
@@ -73,18 +72,18 @@ export function ApiKeyModal({ open, onOpenChange, onSaved }: ApiKeyModalProps) {
               onChange={(e) => setDraft(e.target.value)}
               placeholder="sk-ant-api..."
               autoComplete="off"
-              className="h-11 font-mono text-sm"
+              className="h-11 border-white/15 bg-white/5 font-mono text-sm"
             />
           </div>
 
-          <ul className="space-y-2 rounded-xl border bg-muted/50 p-3 text-xs text-muted-foreground">
+          <ul className="space-y-2 rounded-xl border border-white/10 bg-white/[0.03] p-3 text-xs text-white/60">
             <li className="flex items-start gap-2">
               <ShieldCheck className="mt-0.5 size-3.5 shrink-0 text-primary" />
               Stored only in your browser&rsquo;s localStorage.
             </li>
             <li className="flex items-start gap-2">
               <Sparkles className="mt-0.5 size-3.5 shrink-0 text-primary" />
-              Sent to our server per-request, used once, never persisted.
+              Sent per-request, used once, never persisted on our server.
             </li>
           </ul>
 
@@ -102,7 +101,9 @@ export function ApiKeyModal({ open, onOpenChange, onSaved }: ApiKeyModalProps) {
           <Button variant="ghost" onClick={() => onOpenChange(false)}>
             Not yet
           </Button>
-          <Button onClick={handleSave}>Save key</Button>
+          <Button onClick={handleSave} className="gv-glow">
+            Save key
+          </Button>
         </DialogFooter>
       </DialogContent>
     </Dialog>
