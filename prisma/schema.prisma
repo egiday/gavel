@@ -1,0 +1,73 @@
+// Gavel — dispute settlement via AI jury deliberation
+// schema for cases, messages, verdicts, votes
+
+generator client {
+  provider = "prisma-client"
+  output   = "../src/generated/prisma"
+}
+
+datasource db {
+  provider = "sqlite"
+}
+
+model Case {
+  id                String    @id @default(cuid())
+  mode              String    // "petty" | "real"
+  title             String
+  plaintiffName     String?
+  plaintiffSide     String    // plaintiff's story
+  plaintiffLawyer   String?   // lawyer persona id | null (self-defense)
+  defendantName     String?
+  defendantSide     String?   // defendant's story (null until they join)
+  defendantLawyer   String?   // lawyer persona id | null
+  isSolo            Boolean   @default(false)
+  absentDefendant   Boolean   @default(false) // solo w/ devil's advocate
+  shareCode         String    @unique          // 6-char invite code
+  shareSlug         String    @unique          // public verdict slug
+  status            String    // "awaiting_defendant" | "in_session" | "verdict"
+  jurorIds          String    // JSON array of 5 juror persona ids
+  createdAt         DateTime  @default(now())
+  updatedAt         DateTime  @updatedAt
+  messages          Message[]
+  verdict           Verdict?
+
+  @@index([shareCode])
+  @@index([shareSlug])
+}
+
+model Message {
+  id          String   @id @default(cuid())
+  caseId      String
+  case        Case     @relation(fields: [caseId], references: [id], onDelete: Cascade)
+  speakerType String   // "judge" | "juror" | "lawyer" | "plaintiff" | "defendant"
+  speakerId   String   // persona id for ai, party id for parties
+  speakerName String
+  content     String
+  order       Int
+  createdAt   DateTime @default(now())
+
+  @@index([caseId, order])
+}
+
+model Verdict {
+  id        String   @id @default(cuid())
+  caseId    String   @unique
+  case      Case     @relation(fields: [caseId], references: [id], onDelete: Cascade)
+  ruling    String   // "plaintiff" | "defendant" | "split"
+  summary   String   // majority synthesis
+  topQuote  String?  // pulled highlight from deliberation
+  createdAt DateTime @default(now())
+  votes     Vote[]
+}
+
+model Vote {
+  id        String   @id @default(cuid())
+  verdictId String
+  verdict   Verdict  @relation(fields: [verdictId], references: [id], onDelete: Cascade)
+  jurorId   String
+  jurorName String
+  ruling    String   // "plaintiff" | "defendant"
+  reasoning String
+
+  @@index([verdictId])
+}
