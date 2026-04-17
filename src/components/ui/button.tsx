@@ -57,17 +57,22 @@ function Button({
   asChild = false,
   children,
   render,
+  nativeButton,
   ...props
 }: ButtonOwnProps) {
   const finalRender = asChild
     ? (React.Children.only(children) as React.ReactElement)
     : render
+  // when we're delegating rendering to a non-button element (like a Link → <a>),
+  // disable native-button semantics so Base UI doesn't warn about missing <button>
+  const isNative = nativeButton ?? (asChild ? false : undefined)
 
   return (
     <ButtonPrimitive
       data-slot="button"
       className={cn(buttonVariants({ variant, size, className }))}
       render={finalRender}
+      nativeButton={isNative}
       {...props}
     >
       {asChild ? undefined : children}

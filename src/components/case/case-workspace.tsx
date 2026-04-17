@@ -177,17 +177,17 @@ export function CaseWorkspace(props: Props) {
   );
 }
 
+// in solo mode the plaintiff wrote both sides (or the defendant is absent)
+// so only one lawyer pick is ever required — the plaintiff's.
 function needsPickFor(
   caseData: CasePayload,
   youRole: "plaintiff" | "defendant" | null,
 ): boolean {
   if (caseData.status !== "in_session") return false;
   if (!youRole) return false;
-  // "self" or a lawyer id in the column means picked.
-  // null means hasn't picked yet.
   if (youRole === "plaintiff") return caseData.plaintiffLawyer === null;
   if (youRole === "defendant") {
-    if (caseData.absentDefendant) return false;
+    if (caseData.isSolo) return false; // solo = plaintiff picks once
     return caseData.defendantLawyer === null;
   }
   return false;
@@ -198,12 +198,11 @@ function isWaitingOnOtherSide(
   youRole: "plaintiff" | "defendant" | null,
 ): boolean {
   if (caseData.status !== "in_session") return false;
-  if (caseData.absentDefendant && caseData.isSolo) return false;
+  if (caseData.isSolo) return false; // solo never waits on another party
   if (!youRole) return false;
   if (youRole === "plaintiff") {
     return (
       caseData.plaintiffLawyer !== null &&
-      !caseData.absentDefendant &&
       caseData.defendantLawyer === null
     );
   }
