@@ -11,7 +11,9 @@ export async function POST(
     const { id } = await params;
     const body = await req.json();
     const side = body.side === "defendant" ? "defendant" : "plaintiff";
-    const lawyerId = typeof body.lawyerId === "string" ? body.lawyerId : null;
+    const raw = typeof body.lawyerId === "string" ? body.lawyerId : null;
+    // accept "self" as a sentinel meaning "picked self-defense"
+    const lawyerId = raw === "" || raw === null ? null : raw;
     const updated = await setLawyer(id, side, lawyerId);
     return NextResponse.json(updated);
   } catch (err) {
