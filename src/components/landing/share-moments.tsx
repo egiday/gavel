@@ -17,7 +17,7 @@ const cards: MockCard[] = [
     title: "The Pad Thai Incident",
     ruling: "FOR THE PLAINTIFF",
     quote:
-      "\"Baby, you don't eat another grown woman's leftovers. That's just common sense.\"",
+      "\"Baby, you don't eat another grown woman's leftovers. That's common sense.\"",
     vote: "5-0",
   },
   {
@@ -41,14 +41,14 @@ export function ShareMoments() {
   return (
     <section className="mx-auto w-full max-w-6xl px-4 py-16 safe-x sm:py-24">
       <div className="mx-auto max-w-2xl text-center">
-        <p className="text-xs font-semibold uppercase tracking-widest text-muted-foreground">
+        <p className="font-mono text-[11px] font-semibold uppercase tracking-[0.25em] text-white/50">
           share-worthy
         </p>
-        <h2 className="mt-2 text-3xl font-bold tracking-tight sm:text-4xl">
+        <h2 className="mt-3 font-heading text-3xl font-bold tracking-tight text-white sm:text-5xl">
           Built for the group chat.
         </h2>
-        <p className="mt-3 text-sm text-muted-foreground sm:text-base">
-          Every verdict ships with an auto-generated share card. iMessage unfurls it.
+        <p className="mt-3 text-sm text-white/60 sm:text-base">
+          Every verdict ships with an auto-generated card. iMessage unfurls it.
           Twitter posts it clean. Discord eats it up.
         </p>
       </div>
@@ -61,19 +61,21 @@ export function ShareMoments() {
             whileInView={{ opacity: 1, y: 0 }}
             viewport={{ once: true, amount: 0.3 }}
             transition={{ delay: i * 0.08, duration: 0.5, ease: [0.2, 0.8, 0.2, 1] }}
-            className={`group relative rounded-3xl p-5 shadow-xl ${
+            className={`group relative rounded-3xl border p-5 shadow-xl ${
               c.mode === "petty" ? "mode-petty dark" : "mode-real"
-            } bg-background text-foreground border`}
+            } bg-background text-foreground border-border`}
           >
             <div className="flex items-center justify-between text-xs text-muted-foreground">
-              <span className="inline-flex items-center gap-1.5 font-semibold uppercase tracking-wider">
+              <span className="inline-flex items-center gap-1.5 font-mono font-semibold uppercase tracking-widest">
                 <Gavel className="size-3.5" /> Gavel verdict
               </span>
-              <span className="rounded-full border px-2 py-0.5">{c.vote}</span>
+              <span className="rounded-full border border-border px-2 py-0.5 font-mono">
+                {c.vote}
+              </span>
             </div>
             <h3 className="mt-3 font-heading text-xl font-semibold leading-tight">{c.title}</h3>
-            <div className="mt-4 rounded-2xl border bg-card p-4">
-              <span className="text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">
+            <div className="mt-4 rounded-2xl border border-border bg-card p-4">
+              <span className="font-mono text-[10px] font-semibold uppercase tracking-widest text-muted-foreground">
                 ruling
               </span>
               <p className="mt-1 font-heading text-base font-bold">{c.ruling}</p>

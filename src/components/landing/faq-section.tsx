@@ -29,35 +29,44 @@ const faqs = [
     a: "Yes. You can run solo — write both sides yourself, or pick 'they're not here to defend themselves' and an AI plays devil's advocate for the absent party.",
   },
   {
-    q: "Is the deliberation scripted?",
-    a: "No. Every juror is a live Anthropic call, streaming in real time, seeing what the jurors before them said. They genuinely disagree.",
+    q: "What happens during the trial vs. deliberation?",
+    a: "The trial is lawyers (or self-reps) arguing live while the jury listens silently. Once counsel rests, the jury retires and deliberates among themselves — no lawyers, no parties — before each juror votes.",
+  },
+  {
+    q: "Can people watch without joining?",
+    a: "Yes. From /join you can choose 'Spectate' and just watch the trial unfold. Spectators can also chat live in the peanut gallery during the case.",
   },
 ];
 
 export function FAQSection() {
   return (
-    <section id="faq" className="mx-auto w-full max-w-3xl px-4 py-16 safe-x sm:py-24">
+    <section
+      id="faq"
+      className="mx-auto w-full max-w-3xl px-4 py-16 safe-x sm:py-24"
+    >
       <div className="text-center">
-        <p className="text-xs font-semibold uppercase tracking-widest text-muted-foreground">
+        <p className="font-mono text-[11px] font-semibold uppercase tracking-[0.25em] text-white/50">
           frequently asked
         </p>
-        <h2 className="mt-2 text-3xl font-bold tracking-tight sm:text-4xl">
+        <h2 className="mt-3 font-heading text-3xl font-bold tracking-tight text-white sm:text-5xl">
           Questions the defense raised.
         </h2>
       </div>
 
-      <Accordion className="mt-8 w-full">
-        {faqs.map((f, i) => (
-          <AccordionItem key={f.q} value={`item-${i}`}>
-            <AccordionTrigger className="text-left text-base font-semibold">
-              {f.q}
-            </AccordionTrigger>
-            <AccordionContent className="text-muted-foreground">
-              {f.a}
-            </AccordionContent>
-          </AccordionItem>
-        ))}
-      </Accordion>
+      <div className="mt-10 overflow-hidden rounded-3xl border border-white/10 bg-gradient-to-b from-white/[0.03] to-transparent">
+        <Accordion className="w-full">
+          {faqs.map((f, i) => (
+            <AccordionItem key={f.q} value={`item-${i}`} className="border-white/10 px-5 py-1">
+              <AccordionTrigger className="text-left text-base font-semibold text-white">
+                {f.q}
+              </AccordionTrigger>
+              <AccordionContent className="text-white/70">
+                {f.a}
+              </AccordionContent>
+            </AccordionItem>
+          ))}
+        </Accordion>
+      </div>
     </section>
   );
 }
