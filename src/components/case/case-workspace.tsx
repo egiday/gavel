@@ -31,13 +31,12 @@ export function CaseWorkspace(props: Props) {
   const outerThemeClass = caseData.mode === "petty" ? "mode-petty dark" : "mode-real";
 
   useEffect(() => {
-    // poll while waiting on defendant OR on the other party's lawyer pick
-    const shouldPoll =
-      caseData.status === "awaiting_defendant" ||
-      (caseData.status === "in_session" &&
-        (caseData.plaintiffLawyer === null ||
-          (caseData.defendantLawyer === null && !caseData.absentDefendant)));
-    if (!shouldPoll) return;
+    // poll while we're waiting on something to change server-side:
+    // - defendant to file
+    // - other party's lawyer pick
+    // - verdict rendered by the other device
+    const hasVerdict = caseData.status === "verdict" && !!verdict;
+    if (hasVerdict) return;
     const t = setInterval(async () => {
       const res = await fetch(`/api/cases/${caseData.id}`);
       if (!res.ok) return;
@@ -46,13 +45,7 @@ export function CaseWorkspace(props: Props) {
       if (data.verdict) setVerdict(data.verdict);
     }, 5000);
     return () => clearInterval(t);
-  }, [
-    caseData.id,
-    caseData.status,
-    caseData.plaintiffLawyer,
-    caseData.defendantLawyer,
-    caseData.absentDefendant,
-  ]);
+  }, [caseData.id, caseData.status, verdict]);
 
   function handleLawyerPicked(updated: CasePayload) {
     setCaseData(updated);

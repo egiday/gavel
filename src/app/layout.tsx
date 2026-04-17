@@ -67,10 +67,6 @@ export const metadata: Metadata = {
       "Submit a dispute. Watch a jury of AI personas argue it out and hand down a verdict.",
     images: ["/og.png"],
   },
-  icons: {
-    icon: "/favicon.ico",
-    apple: "/apple-touch-icon.png",
-  },
 };
 
 export const viewport: Viewport = {
